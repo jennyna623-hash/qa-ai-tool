@@ -153,17 +153,24 @@
                   <button class="button ghost hidden" type="button" id="jiraDisconnect">中斷</button>
                 </div>
               </div>
-              <label class="field"><span>標題</span><input id="bugOutputTitle" readonly></label>
-              <div class="inline-actions"><button class="button soft" type="button" data-copy="bugOutputTitle">複製標題</button></div>
               <div class="field">
-                <span>描述</span>
+                <div class="output-field-head">
+                  <span>標題</span>
+                  <button class="button soft" type="button" data-copy="bugOutputTitle">複製標題</button>
+                </div>
+                <input id="bugOutputTitle" readonly>
+              </div>
+              <div class="field">
+                <div class="output-field-head">
+                  <span>描述</span>
+                  <button class="button primary" type="button" id="jiraCreateIssue">建立 Jira BUG</button>
+                </div>
                 <div class="jira-description-preview" id="bugOutputPreview" aria-live="polite">
                   <p class="description-preview-empty">產生內容後，文字與使用的圖片會顯示在這裡。</p>
                 </div>
                 <textarea id="bugOutputContent" hidden readonly></textarea>
               </div>
               <div class="inline-actions">
-                <button class="button primary" type="button" id="jiraCreateIssue">建立 Jira BUG</button>
                 <button class="button soft" type="button" data-copy="bugOutputContent">複製描述</button>
                 <button class="button ghost" type="button" id="openJiraCreate">開啟 Jira</button>
               </div>
