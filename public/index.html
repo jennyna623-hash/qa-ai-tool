@@ -120,11 +120,13 @@
               <div class="field full">
                 <span id="bugActualLabel">實際結果</span>
                 <div class="result-rich-editor" id="bugActual" data-screenshot-section="actual" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="bugActualLabel" data-placeholder="輸入文字，或直接 Ctrl+V 貼上圖片"></div>
+                <input id="bugActualPasteInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden tabindex="-1" aria-hidden="true">
                 <small>可直接輸入文字、貼上或拖曳圖片；最多 5 張，每張不超過 5MB。</small>
               </div>
               <div class="field full">
                 <span id="bugExpectedLabel">預期結果</span>
                 <div class="result-rich-editor" id="bugExpected" data-screenshot-section="expected" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="bugExpectedLabel" data-placeholder="輸入文字，或直接 Ctrl+V 貼上圖片"></div>
+                <input id="bugExpectedPasteInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden tabindex="-1" aria-hidden="true">
                 <small>圖片會顯示在內容中；建單後仍會保留 Jira 附件並出現在對應段落。</small>
               </div>
             </div>

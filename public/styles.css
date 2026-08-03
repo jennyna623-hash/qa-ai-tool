@@ -147,6 +147,9 @@ input[readonly], textarea[readonly] { background: #f8fafc; }
 .description-preview-gallery figure { margin: 0; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
 .description-preview-gallery img { display: block; width: 100%; max-height: 360px; object-fit: contain; border-radius: 7px; background: #eef2f7; }
 .description-preview-gallery figcaption { margin-top: 7px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.description-preview-image { margin: 12px 0; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.description-preview-image img { display: block; width: 100%; max-height: 360px; object-fit: contain; border-radius: 7px; background: #eef2f7; }
+.description-preview-image figcaption { margin-top: 7px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .actions, .inline-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .inline-actions { margin-top: 10px; }
 .button { min-height: 40px; padding: 0 16px; border: 1px solid transparent; border-radius: 10px; font-weight: 750; }

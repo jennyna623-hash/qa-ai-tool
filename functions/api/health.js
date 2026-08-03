@@ -8,7 +8,7 @@ export async function onRequestGet({ env }) {
   return Response.json({
     ok: true,
     service: "GSI AI Tools Cloud",
-    version: "0.5.0",
+    version: "0.5.1",
     integrations: {
       jira: jiraConfigured,
       notion: false

@@ -303,25 +303,49 @@ function externalImageNode(image) {
   };
 }
 
+function imageMarker(node) {
+  if (node?.type !== "paragraph" || !Array.isArray(node.content)) return null;
+  const value = node.content.map((item) => item?.text || "").join("").trim();
+  const match = value.match(/^\[\[GSI_RESULT_IMAGE:(actual|expected):(\d+)\]\]$/);
+  return match ? { section: match[1], index: Number(match[2]) } : null;
+}
+
 export function plainTextToAdfWithImages(value, imagesBySection = {}) {
   const document = plainTextToAdf(value);
   const sectionImages = new Map([
-    ["實際結果", Array.isArray(imagesBySection.actual) ? imagesBySection.actual : []],
-    ["預期結果", Array.isArray(imagesBySection.expected) ? imagesBySection.expected : []]
+    ["actual", Array.isArray(imagesBySection.actual) ? imagesBySection.actual : []],
+    ["expected", Array.isArray(imagesBySection.expected) ? imagesBySection.expected : []]
   ]);
+  const headingSections = new Map([
+    ["實際結果", "actual"],
+    ["預期結果", "expected"]
+  ]);
+  const embeddedImages = new Set();
   const content = [];
   let activeSection = "";
 
   const appendActiveImages = () => {
     const images = sectionImages.get(activeSection) || [];
-    images.forEach((image) => content.push(externalImageNode(image)));
+    images.forEach((image, index) => {
+      const key = `${activeSection}:${index}`;
+      if (!embeddedImages.has(key)) content.push(externalImageNode(image));
+    });
   };
 
   document.content.forEach((node) => {
+    const marker = imageMarker(node);
+    if (marker) {
+      const image = (sectionImages.get(marker.section) || [])[marker.index];
+      if (image) {
+        content.push(externalImageNode(image));
+        embeddedImages.add(`${marker.section}:${marker.index}`);
+      }
+      return;
+    }
     const nextHeading = headingText(node);
     if (nextHeading) {
       appendActiveImages();
-      activeSection = nextHeading;
+      activeSection = headingSections.get(nextHeading) || "";
     }
     content.push(node);
   });

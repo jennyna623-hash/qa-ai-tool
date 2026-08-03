@@ -170,11 +170,62 @@ function getResultEditor(section) {
   return byId(section === "expected" ? "bugExpected" : "bugActual");
 }
 
-function getResultText(section) {
+function getResultSegments(section) {
   const editor = getResultEditor(section);
-  const copy = editor.cloneNode(true);
-  copy.querySelectorAll("[data-attachment-id]").forEach((node) => node.remove());
-  return String(copy.innerText || copy.textContent || "").replace(/\u00a0/g, " ").trim();
+  const segments = [];
+  const blockNames = new Set(["DIV", "P", "LI", "UL", "OL", "BLOCKQUOTE", "PRE"]);
+  let text = "";
+
+  const flushText = () => {
+    const value = text.replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+    if (value) segments.push({ type: "text", text: value });
+    text = "";
+  };
+  const appendBreak = () => {
+    if (text && !text.endsWith("\n")) text += "\n";
+  };
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.textContent || "";
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.dataset?.attachmentId) {
+      flushText();
+      const attachment = bugAttachments.find((item) => item.id === node.dataset.attachmentId);
+      if (attachment) segments.push({ type: "image", attachment });
+      return;
+    }
+    if (node.tagName === "BR") {
+      text += "\n";
+      return;
+    }
+    const isBlock = blockNames.has(node.tagName);
+    if (isBlock) appendBreak();
+    Array.from(node.childNodes).forEach(walk);
+    if (isBlock) appendBreak();
+  };
+
+  Array.from(editor.childNodes).forEach(walk);
+  flushText();
+  return segments;
+}
+
+function getResultText(section) {
+  return getResultSegments(section)
+    .filter((segment) => segment.type === "text")
+    .map((segment) => segment.text)
+    .join("\n")
+    .trim();
+}
+
+function getResultMarkedText(section) {
+  const attachments = bugAttachments.filter((attachment) => attachment.section === section);
+  return getResultSegments(section).map((segment) => {
+    if (segment.type === "text") return segment.text;
+    const index = attachments.findIndex((attachment) => attachment.id === segment.attachment.id);
+    return index >= 0 ? `[[GSI_RESULT_IMAGE:${section}:${index}]]` : "";
+  }).filter(Boolean).join("\n").trim();
 }
 
 function removeBugAttachment(attachmentId) {
@@ -263,6 +314,8 @@ function addBugAttachments(files, section = "actual") {
 function clearBugAttachments() {
   bugAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
   bugAttachments = [];
+  byId("bugActualPasteInput").value = "";
+  byId("bugExpectedPasteInput").value = "";
   document.querySelectorAll("[data-attachment-id]").forEach((node) => node.remove());
 }
 
@@ -311,6 +364,41 @@ function appendPreviewSection(preview, title, text, attachments = []) {
   preview.appendChild(section);
 }
 
+function appendResultPreviewSection(preview, title, resultSection) {
+  const section = document.createElement("section");
+  section.className = "description-preview-section";
+  const heading = document.createElement("h4");
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  const segments = getResultSegments(resultSection);
+  if (!segments.length) {
+    const empty = document.createElement("p");
+    empty.className = "description-preview-copy";
+    empty.textContent = "—";
+    section.appendChild(empty);
+  }
+  segments.forEach((segment, index) => {
+    if (segment.type === "text") {
+      const copy = document.createElement("p");
+      copy.className = "description-preview-copy";
+      copy.textContent = segment.text;
+      section.appendChild(copy);
+      return;
+    }
+    const figure = document.createElement("figure");
+    figure.className = "description-preview-image";
+    const image = document.createElement("img");
+    image.src = segment.attachment.previewUrl;
+    image.alt = segment.attachment.file.name || `${title}圖片 ${index + 1}`;
+    const caption = document.createElement("figcaption");
+    caption.textContent = segment.attachment.file.name || `${title}圖片 ${index + 1}`;
+    figure.append(image, caption);
+    section.appendChild(figure);
+  });
+  preview.appendChild(section);
+}
+
 function renderBugOutputPreview() {
   const preview = byId("bugOutputPreview");
   if (!preview) return;
@@ -333,35 +421,22 @@ function renderBugOutputPreview() {
   appendPreviewSection(preview, "基本信息", basicInfo);
   appendPreviewSection(preview, "問題描述", byId("bugTitleSeed").value.trim());
   appendPreviewSection(preview, "操作步驟", byId("bugSteps").value.trim());
-  appendPreviewSection(
-    preview,
-    "實際結果",
-    getResultText("actual"),
-    bugAttachments.filter((attachment) => attachment.section === "actual")
-  );
-  appendPreviewSection(
-    preview,
-    "預期結果",
-    getResultText("expected"),
-    bugAttachments.filter((attachment) => attachment.section === "expected")
-  );
+  appendResultPreviewSection(preview, "實際結果", "actual");
+  appendResultPreviewSection(preview, "預期結果", "expected");
 }
 
-function buildBugOutput() {
+function buildBugDescription(useImageMarkers = false) {
   const env = byId("bugEnv").value;
   const site = byId("bugSite").value;
   const agentUrl = byId("bugAgentUrl").value;
   const memberUrl = byId("bugMemberUrl").value;
   const account = byId("bugMemberAccount").value.trim();
   const password = byId("bugMemberPassword").value.trim();
-  const assignee = byId("bugAssignee").value;
-  const parent = normalizeIssueNumber(byId("bugParent").value);
   const seed = byId("bugTitleSeed").value.trim();
   const steps = byId("bugSteps").value.trim();
-  const actual = getResultText("actual");
-  const expected = getResultText("expected");
-  const title = `[BUG][${env}][${getTitleSiteLabel(site, memberUrl)}]${seed}`;
-  const content = [
+  const actual = useImageMarkers ? getResultMarkedText("actual") : getResultText("actual");
+  const expected = useImageMarkers ? getResultMarkedText("expected") : getResultText("expected");
+  return [
     "基本信息",
     `環境：${env}`,
     `版型：${site}`,
@@ -381,6 +456,15 @@ function buildBugOutput() {
     "預期結果：",
     expected
   ].join("\n");
+}
+
+function buildBugOutput() {
+  const env = byId("bugEnv").value;
+  const site = byId("bugSite").value;
+  const memberUrl = byId("bugMemberUrl").value;
+  const seed = byId("bugTitleSeed").value.trim();
+  const title = `[BUG][${env}][${getTitleSiteLabel(site, memberUrl)}]${seed}`;
+  const content = buildBugDescription();
   byId("bugOutputTitle").value = title;
   byId("bugOutputContent").value = content;
   renderBugOutputPreview();
@@ -536,7 +620,7 @@ async function createJiraIssue() {
       button.textContent = "上傳附件…";
       const attachmentBody = new FormData();
       attachmentBody.append("issueKey", data.issueKey);
-      attachmentBody.append("description", byId("bugOutputContent").value);
+      attachmentBody.append("description", buildBugDescription(true));
       bugAttachments.forEach((attachment) => {
         const field = attachment.section === "expected" ? "expectedFile" : "actualFile";
         attachmentBody.append(field, attachment.file, attachment.file.name);
@@ -850,6 +934,11 @@ byId("bugAssignee").addEventListener("change", updateBugMeta);
 byId("bugParent").addEventListener("input", updateBugMeta);
 function bindResultEditor(section) {
   const editor = getResultEditor(section);
+  const pasteInput = byId(section === "expected" ? "bugExpectedPasteInput" : "bugActualPasteInput");
+  pasteInput.addEventListener("change", (event) => {
+    addBugAttachments(event.target.files, section);
+    event.target.value = "";
+  });
   editor.addEventListener("dragover", (event) => {
     event.preventDefault();
     editor.classList.add("dragging");
