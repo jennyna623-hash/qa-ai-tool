@@ -233,28 +233,30 @@
 
       <section class="view" id="view-weekly" data-title="周進度">
         <div class="page-intro">
-          <div><h2>整理本周工作進度</h2><p>目前可手動分類與輸出；Jira／Notion API 會在第二階段接上。</p></div>
-          <span class="planned-label">API 待串接</span>
+          <div><h2>整理本周工作進度</h2><p>輸入 Jira 單號後，自動讀取標題、狀態並加入對應進度分類。</p></div>
+          <span class="ready-label">Jira Ready</span>
         </div>
 
         <div class="card">
           <div class="form-grid weekly-top-grid">
             <label class="field"><span>參考日期</span><input id="weeklyDate" type="date"></label>
-            <label class="field"><span>填寫人</span><input id="weeklyReporter" type="text" placeholder="例如：Jenny"></label>
-            <label class="field full"><span>Jira 單號或 Notion 網址</span><textarea id="weeklySources" rows="3" placeholder="GSI-86&#10;https://gamingsoft.atlassian.net/browse/GSI-214&#10;Notion 網址"></textarea></label>
+            <label class="field"><span>填寫人</span><select id="weeklyReporter"><option value="Jenny">Jenny</option><option value="Ben">Ben</option><option value="Guan">Guan</option></select></label>
+            <label class="field full"><span>Jira 單號</span><textarea id="weeklySources" rows="3" placeholder="GSI-86&#10;https://gamingsoft.atlassian.net/browse/GSI-214&#10;482"></textarea><small>可一次輸入多筆 Jira 單號或 Jira 網址。</small></label>
           </div>
           <div class="actions">
-            <button class="button primary" type="button" id="weeklyAdd">加入清單</button>
+            <button class="button primary" type="button" id="weeklyAdd">讀取並加入</button>
+            <button class="button soft" type="button" id="weeklyConnectJira">連接 Jira</button>
             <button class="button ghost" type="button" id="weeklyClear">清空本周</button>
           </div>
-          <div class="notice"><strong>第一階段：</strong>新單會先放在「其他／待處理」，可在下方手動選擇分類。串接 Jira 後會依狀態自動歸類。</div>
+          <div class="report-status" id="weeklySyncStatus" aria-live="polite">請輸入 Jira 單號；自動分類後仍可手動調整。</div>
+          <div class="notice"><strong>自動分類：</strong>依 Jira 狀態分為 DEV 測試中、STG 測試中、待修正、待進版 PROD、已完成或其他／待處理。</div>
         </div>
 
         <div class="weekly-board" id="weeklyBoard"></div>
 
         <article class="card output-card">
           <div class="output-head"><div><span>WEEKLY OUTPUT</span><h3>周進度彙整</h3></div><span id="weeklyRange" class="mini-state"></span></div>
-          <textarea id="weeklyOutput" rows="16" placeholder="加入 Jira／Notion 項目後產生彙整"></textarea>
+          <textarea id="weeklyOutput" rows="16" placeholder="加入 Jira 項目後產生彙整"></textarea>
           <div class="inline-actions">
             <button class="button primary" type="button" id="weeklyGenerate">重新整理彙整</button>
             <button class="button soft" type="button" data-copy="weeklyOutput">複製結果</button>
@@ -281,7 +283,7 @@
           </article>
           <article class="card warning-card">
             <h3>安全提醒</h3>
-            <p>請勿在 GitHub 放入 Jira Token、Notion Token、正式站密碼或任何 <code>.env</code> 檔案。之後的 API 金鑰會存入 Cloudflare Secrets。</p>
+            <p>請勿在 GitHub 放入 Jira Token、正式站密碼或任何 <code>.env</code> 檔案。API 金鑰須存入 Cloudflare Secrets。</p>
           </article>
         </div>
       </section>
@@ -292,9 +294,8 @@
           <span class="ready-label">V1</span>
         </div>
         <div class="status-grid">
-          <article class="status-card done"><span>已完成</span><h3>雲端前端</h3><p>BUG 模板、需求單回報、同事設定、周進度手動彙整及本機瀏覽器保存。</p></article>
-          <article class="status-card done"><span>已完成</span><h3>Jira API</h3><p>OAuth 安全連接、建立 BUG、截圖附件、需求回報讀取、自動選擇受託人及關聯主單。</p></article>
-          <article class="status-card next"><span>下一階段</span><h3>Notion API</h3><p>讀取授權頁面並將內容加入周進度分類。</p></article>
+          <article class="status-card done"><span>已完成</span><h3>雲端前端</h3><p>BUG 模板、需求單回報、同事設定、周進度 Jira 彙整及本機瀏覽器保存。</p></article>
+          <article class="status-card done"><span>已完成</span><h3>Jira API</h3><p>OAuth 安全連接、建立 BUG、截圖附件、需求回報與周進度讀取、自動選擇受託人及關聯主單。</p></article>
           <article class="status-card blocked"><span>需改造</span><h3>網站自動登入</h3><p>Cloudflare 無法啟動本機 Chrome；需改用官方 API 或獨立瀏覽器服務。</p></article>
         </div>
         <article class="card health-card">

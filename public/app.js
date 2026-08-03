@@ -1,5 +1,6 @@
 const STORAGE_KEY = "gsi-ai-tools-cloud-v1";
 const WEEKLY_GROUPS = ["DEV 測試中", "STG 測試中", "待修正", "待進版 PROD", "已完成", "其他／待處理"];
+const WEEKLY_REPORTERS = ["Jenny", "Ben", "Guan"];
 const ASSIGNEES = ["Edward", "corey", "JOSEPH", "偉恩", "Ken", "KevinKao", "Will Zhang", "Simon Wu", "Jason hu"];
 const MAX_BUG_ATTACHMENTS_PER_SECTION = 5;
 const MAX_BUG_ATTACHMENT_BYTES = 5 * 1024 * 1024;
@@ -501,26 +502,32 @@ function renderJiraConnection() {
   const text = byId("jiraConnectionText");
   const connect = byId("jiraConnect");
   const disconnect = byId("jiraDisconnect");
+  const weeklyConnect = byId("weeklyConnectJira");
   card.classList.toggle("connected", jiraConnection.connected);
   card.classList.toggle("not-configured", !jiraConnection.configured);
   dot.classList.toggle("connected", jiraConnection.connected);
   connect.classList.toggle("hidden", jiraConnection.connected);
   disconnect.classList.toggle("hidden", !jiraConnection.connected);
+  weeklyConnect.textContent = jiraConnection.connected ? "Jira 已連接" : "連接 Jira";
+  weeklyConnect.disabled = jiraConnection.connected;
 
   if (jiraConnection.connected) {
     title.textContent = "Jira 已連接";
     text.textContent = `${jiraConnection.displayName || "目前帳號"}｜${jiraConnection.projectKey || "GSI"}`;
+    setWeeklySyncStatus(`Jira 已連接：${jiraConnection.displayName || "目前帳號"}。請輸入單號讀取資料。`, "ok");
     connect.disabled = false;
     return;
   }
   if (!jiraConnection.configured) {
     title.textContent = "Jira 尚未完成設定";
     text.textContent = jiraConnection.message || "需要先設定 Atlassian OAuth";
+    setWeeklySyncStatus(jiraConnection.message || "Jira 尚未完成設定。", "error");
     connect.disabled = false;
     return;
   }
   title.textContent = "Jira 尚未連接";
   text.textContent = `連接 ${jiraConnection.siteUrl || "gamingsoft.atlassian.net"} 後可直接建單`;
+  setWeeklySyncStatus("請先連接 Jira，再輸入 Jira 單號。", "error");
   connect.disabled = false;
 }
 
@@ -855,48 +862,97 @@ function currentWeekKey() {
 
 function currentWeeklyData() {
   const key = currentWeekKey();
-  if (!state.weekly[key]) state.weekly[key] = { reporter: "", items: [], output: "" };
+  if (!state.weekly[key]) state.weekly[key] = { reporter: "Jenny", items: [], output: "" };
+  const data = state.weekly[key];
+  if (!WEEKLY_REPORTERS.includes(data.reporter)) data.reporter = "Jenny";
+  data.items = Array.isArray(data.items) ? data.items.filter((item) => item.type !== "notion") : [];
   return state.weekly[key];
 }
 
 function extractSources(raw) {
   const sources = [];
-  const jiraMatches = String(raw || "").match(/(?:https?:\/\/[^\s]*\/browse\/)?GSI-\d+|\b\d+\b/gi) || [];
-  jiraMatches.forEach((match) => {
+  const value = String(raw || "");
+  const jiraMatches = value.match(/(?:https?:\/\/[^\s]*\/browse\/)?GSI-\d+/gi) || [];
+  const numberTokens = value.split(/[\s,，;；]+/).map((token) => token.trim()).filter((token) => /^\d+$/.test(token));
+  [...jiraMatches, ...numberTokens].forEach((match) => {
     const number = normalizeIssueNumber(match);
     if (number) sources.push({ type: "jira", key: `GSI-${number}`, url: `${state.jiraBaseUrl.replace(/\/$/, "")}/browse/GSI-${number}` });
-  });
-  const urlMatches = String(raw || "").match(/https?:\/\/[^\s<>"]+/gi) || [];
-  urlMatches.forEach((url) => {
-    if (/notion\.(?:com|site)/i.test(url)) sources.push({ type: "notion", key: "Notion", url: url.replace(/[),，。]+$/, "") });
   });
   return sources.filter((source, index, all) => all.findIndex((item) => item.url === source.url) === index);
 }
 
-function addWeeklySources() {
+function setWeeklySyncStatus(message, tone = "") {
+  const status = byId("weeklySyncStatus");
+  status.textContent = message;
+  status.classList.remove("ok", "error");
+  if (tone) status.classList.add(tone);
+}
+
+async function addWeeklySources() {
   const sources = extractSources(byId("weeklySources").value);
   if (!sources.length) {
-    showToast("請輸入 Jira 單號或 Notion 網址");
+    showToast("請輸入 Jira 單號");
     return;
   }
+  if (!jiraConnection.connected) {
+    setWeeklySyncStatus("請先連接 Jira，完成後再讀取單號。", "error");
+    if (jiraConnection.configured) connectJira();
+    else showToast(jiraConnection.message || "請先完成 Jira OAuth 設定");
+    return;
+  }
+
+  const addButton = byId("weeklyAdd");
+  addButton.disabled = true;
+  addButton.textContent = "讀取 Jira 中…";
+  setWeeklySyncStatus(`正在讀取 ${sources.length} 筆 Jira 資料…`);
+
   const data = currentWeeklyData();
-  let added = 0;
-  sources.forEach((source) => {
-    if (data.items.some((item) => item.url === source.url)) return;
-    data.items.push({
-      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-      ...source,
-      summary: source.type === "jira" ? `${source.key}｜待讀取 Jira 標題` : "Notion｜待讀取頁面標題",
-      status: "待串接 API",
-      group: "其他／待處理"
+  try {
+    const response = await fetch("/api/jira/weekly", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ issues: sources.map((source) => source.key) })
     });
-    added += 1;
-  });
-  byId("weeklySources").value = "";
-  saveWeeklyForm();
-  renderWeeklyBoard();
-  generateWeeklyOutput();
-  showToast(added ? `已加入 ${added} 筆資料` : "清單中已有相同資料");
+    const result = await response.json().catch(() => ({ ok: false, message: `Jira 資料讀取失敗（HTTP ${response.status}）` }));
+    if (response.status === 401) {
+      jiraConnection.connected = false;
+      renderJiraConnection();
+    }
+    if (!response.ok || !result.ok) throw new Error(result.message || "Jira 資料讀取失敗");
+
+    let added = 0;
+    let updated = 0;
+    result.items.forEach((jiraItem) => {
+      const existing = data.items.find((item) => item.key === jiraItem.key);
+      if (existing) {
+        Object.assign(existing, jiraItem, { type: "jira" });
+        updated += 1;
+        return;
+      }
+      data.items.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        type: "jira",
+        ...jiraItem
+      });
+      added += 1;
+    });
+    byId("weeklySources").value = "";
+    saveWeeklyForm();
+    renderWeeklyBoard();
+    generateWeeklyOutput();
+    const failed = Array.isArray(result.errors) ? result.errors.length : 0;
+    const summary = [`新增 ${added} 筆`, `更新 ${updated} 筆`];
+    if (failed) summary.push(`失敗 ${failed} 筆`);
+    setWeeklySyncStatus(`Jira 同步完成：${summary.join("、")}`, failed ? "error" : "ok");
+    showToast(`已同步 ${added + updated} 筆 Jira 資料`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Jira 資料讀取失敗";
+    setWeeklySyncStatus(message, "error");
+    showToast(message);
+  } finally {
+    addButton.disabled = false;
+    addButton.textContent = "讀取並加入";
+  }
 }
 
 function renderWeeklyBoard() {
@@ -995,7 +1051,7 @@ function saveWeeklyForm() {
 function loadWeekly() {
   const dates = getWeekDates(byId("weeklyDate").value);
   const data = currentWeeklyData();
-  byId("weeklyReporter").value = data.reporter || "";
+  byId("weeklyReporter").value = WEEKLY_REPORTERS.includes(data.reporter) ? data.reporter : "Jenny";
   byId("weeklyOutput").value = data.output || "";
   byId("weeklyRange").textContent = `${shortDate(dates[0])}－${shortDate(dates[4])}`;
   renderWeeklyBoard();
@@ -1019,7 +1075,7 @@ function generateWeeklyOutput() {
 
 function clearWeekly() {
   if (!window.confirm("確定清空本周資料嗎？")) return;
-  state.weekly[currentWeekKey()] = { reporter: "", items: [], output: "" };
+  state.weekly[currentWeekKey()] = { reporter: "Jenny", items: [], output: "" };
   saveState();
   loadWeekly();
   showToast("已清空本周資料");
@@ -1136,11 +1192,12 @@ byId("requirementReportStage").addEventListener("change", (event) => {
 byId("requirementConnectJira").addEventListener("click", connectJira);
 byId("requirementReportEdit").addEventListener("click", () => setRequirementReportEditing(!requirementReportEditing));
 byId("requirementReportCopy").addEventListener("click", copyRequirementReport);
+byId("weeklyConnectJira").addEventListener("click", connectJira);
 byId("weeklyAdd").addEventListener("click", addWeeklySources);
 byId("weeklyClear").addEventListener("click", clearWeekly);
 byId("weeklyGenerate").addEventListener("click", generateWeeklyOutput);
 byId("weeklyDate").addEventListener("change", loadWeekly);
-byId("weeklyReporter").addEventListener("input", saveWeeklyForm);
+byId("weeklyReporter").addEventListener("change", saveWeeklyForm);
 byId("weeklyOutput").addEventListener("input", saveWeeklyForm);
 byId("settingsForm").addEventListener("submit", saveSettings);
 byId("healthCheck").addEventListener("click", checkHealth);

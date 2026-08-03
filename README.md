@@ -8,7 +8,7 @@
 - 只有會員端 `https://gsi2.gsiwl.com/` 自動使用 `[新架構]` 標題；其他 R017 站點使用 `[R017]`
 - 固定受託人清單，預設 Edward
 - 受託人與主單不寫入描述
-- 周進度項目、手動分類與彙整
+- 周進度輸入 Jira 單號後，自動讀取標題、狀態與分類；填寫人可選 Jenny、Ben 或 Guan
 - 每位同事的瀏覽器個人設定
 - Cloudflare Pages Function 健康檢查
 - Atlassian OAuth 2.0 安全連接
@@ -21,8 +21,6 @@
 
 ## 尚待串接
 
-- Notion Integration／OAuth
-- Jira／Notion 周進度自動讀取與分類
 - 原本依賴本機 Chrome 的網站自動登入
 
 ## Cloudflare Pages 建議設定
@@ -72,7 +70,7 @@ npm run dev
 請勿提交以下內容到 GitHub：
 
 - `.env`、`.dev.vars`
-- Jira／Notion Token
+- Jira Token
 - Cloudflare API Token
 - 正式站帳號密碼
 
