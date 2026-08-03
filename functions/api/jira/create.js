@@ -32,7 +32,11 @@ async function resolveIssueType(session, env, project) {
   );
   if (!response.ok) throw new Error(await jiraError(response, "無法取得 GSI 工作類型"));
   const data = await response.json();
-  const values = Array.isArray(data.values) ? data.values : [];
+  const values = Array.isArray(data.values)
+    ? data.values
+    : Array.isArray(data.issueTypes)
+      ? data.issueTypes
+      : [];
   const exactNames = ["漏洞", "bug", "錯誤", "缺陷"];
   const issueType = values.find((item) =>
     !item.subtask && exactNames.includes(String(item.name || "").trim().toLowerCase())
