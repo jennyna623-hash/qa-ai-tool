@@ -1043,6 +1043,10 @@ function createWeeklyItem(item) {
     saveWeeklyForm();
     renderWeeklyBoard();
     generateWeeklyOutput();
+    if (item.type === "manual") {
+      byId("weeklyManualMessage").textContent = "已移除手動項目。";
+      byId("weeklyManualMessage").className = "report-status";
+    }
   });
   top.append(source, remove);
   wrap.appendChild(top);
