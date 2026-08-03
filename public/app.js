@@ -1,0 +1,493 @@
+const STORAGE_KEY = "gsi-ai-tools-cloud-v1";
+const WEEKLY_GROUPS = ["DEV 測試中", "STG 測試中", "待修正", "待進版 PROD", "已完成", "其他／待處理"];
+const ASSIGNEES = ["Edward", "corey", "JOSEPH", "偉恩", "Ken", "KevinKao", "Will Zhang", "Simon Wu", "Jason hu"];
+
+const SITES = [
+  { url: "https://agent-bmm1-dev.gsiwl.com", env: "DEV", code: "set_r021｜R021" },
+  { url: "https://agent-dobt-dev.gsiwl.com", env: "DEV", code: "okbet｜R001" },
+  { url: "https://agent-gogd-dev.gsiwl.com", env: "DEV", code: "okbet｜R001" },
+  { url: "https://agent-bkgd-dev.gsiwl.com", env: "DEV", code: "okbet_blackGold｜R003" },
+  { url: "https://agent-fp1d-dev.gsiwl.com", env: "DEV", code: "okbet_green｜R026" },
+  { url: "https://agent-dobr-dev.gsiwl.com", env: "DEV", code: "okbet_red｜R018" },
+  { url: "https://agent-obrb-dev.gsiwl.com/#/Login", env: "DEV", code: "okbet_redBlack｜R020" },
+  { url: "https://agent-dbod-dev.gsiwl.com", env: "DEV", code: "set50｜R015" },
+  { url: "https://agent-ed03-dev.gsiwl.com", env: "DEV", code: "set_ed3｜R019" },
+  { url: "https://agent-ed88-dev.gsiwl.com", env: "DEV", code: "set_ed8888｜R011" },
+  { url: "https://agent-jkhd-dev.gsiwl.com", env: "DEV", code: "set_51(set_jokerhill)｜R010" },
+  { url: "https://agent-r016-dev.gsiwl.com", env: "DEV", code: "set_r016" },
+  { url: "https://agent-gsai-dev.gsiwl.com", env: "DEV", code: "set_r017｜R017" },
+  { url: "https://agent-r022-dev.gsiwl.com", env: "DEV", code: "set_r022｜R022" },
+  { url: "https://agent-r023-dev.gsiwl.com", env: "DEV", code: "set_r023" },
+  { url: "https://agent-r024-dev.gsiwl.com", env: "DEV", code: "set_r024" },
+  { url: "https://agent-r025-dev.gsiwl.com", env: "DEV", code: "set_r025" },
+  { url: "https://agent-rysd-dev.gsiwl.com", env: "DEV", code: "set_royalslot88｜R014" },
+  { url: "https://agent-d334-dev.gsiwl.com", env: "DEV", code: "set33_GREEN｜R007" },
+  { url: "https://agent-skd1-dev.gsiwl.com", env: "DEV", code: "set33_RED｜R008" },
+  { url: "https://agent-djpn-dev.gsiwl.com", env: "DEV", code: "set_amuse｜R013" },
+  { url: "https://agent-s334.gsiwl.com", env: "STG", code: "set33_GREEN｜R007" },
+  { url: "https://agent-33rd.gsiwl.com", env: "STG", code: "set33_RED｜R008" },
+  { url: "https://agent-sjpn.gsiwl.com", env: "STG", code: "set_amuse｜R013" },
+  { url: "https://agent-obbl.gsiwl.com", env: "STG", code: "okbet_blackGold｜R003" },
+  { url: "https://agent-ps51.gsiwl.com", env: "STG", code: "set_51(set_jokerhill)｜R010" },
+  { url: "https://agent-ps50.gsiwl.com", env: "STG", code: "set50｜R015" },
+  { url: "https://agent-ed1d.gsiwl.com", env: "STG", code: "set_ed8888｜R011" },
+  { url: "https://agent-gsi1.gsiwl.com", env: "STG", code: "okbet｜R001" },
+  { url: "https://agent-gsi3.gsiwl.com", env: "STG", code: "okbet｜R001" },
+  { url: "https://agent-r171.gsiwl.com", env: "STG", code: "set_r017｜R017" },
+  { url: "https://agent-r017.gsiwl.com", env: "STG", code: "set_r017｜R017" },
+  { url: "https://agent-gsi2.gsiwl.com", env: "STG", code: "set_r017｜R017" },
+  { url: "https://agent-obrd.gsiwl.com", env: "STG", code: "okbet_red｜R018" },
+  { url: "https://agent-ed3d.gsiwl.com", env: "STG", code: "set_ed3｜R019" },
+  { url: "https://agent-r021.gsiwl.com", env: "STG", code: "set_r021｜R021" },
+  { url: "https://agent-r020.gsiwl.com", env: "STG", code: "okbet_redBlack｜R020" },
+  { url: "https://agent-obtn.gsiwl.com", env: "STG", code: "set_r022｜R022" },
+  { url: "https://agent-phb1.gsiwl.com", env: "STG", code: "set_r022｜R022" },
+  { url: "https://agent-obbg.gsiwl.com", env: "STG", code: "okbet_green｜R026" },
+  { url: "https://agent-obtp.gsiwl.com", env: "STG", code: "R023" },
+  { url: "https://agent-obbb.gsiwl.com", env: "STG", code: "R024" },
+  { url: "https://agent-obgb.gsiwl.com", env: "STG", code: "R025" },
+  { url: "https://agent-ed3b.gsiwl.com", env: "STG", code: "R029" },
+  { url: "https://agent-r172.gsiwl.com", env: "STG", code: "R027" },
+  { url: "https://agent-r17b.gsiwl.com", env: "STG", code: "R030" },
+  { url: "https://agent-r17p.gsiwl.com", env: "STG", code: "R031" },
+  { url: "https://agent-r321.gsiwl.com", env: "STG", code: "R032" },
+  { url: "https://agent-r331.gsiwl.com", env: "STG", code: "R033" },
+  { url: "https://agent-gsi1.gpsriowdl.com", env: "PROD", code: "R001" },
+  { url: "https://agent-fp1a.gpsriowdl.com", env: "PROD", code: "okbet_green｜R026" },
+  { url: "https://agent-skg1.gpsriowdl.com", env: "PROD", code: "set33_RED｜R008" },
+  { url: "https://agent-rue1.gpsriowdl.com", env: "PROD", code: "okbet_blackGold｜R003" },
+  { url: "https://agent-phb1.gpsriowdl.com", env: "PROD", code: "R022" }
+];
+
+const byId = (id) => document.getElementById(id);
+const state = loadState();
+let toastTimer;
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    return {
+      defaultAssignee: saved.defaultAssignee || "Edward",
+      jiraBaseUrl: saved.jiraBaseUrl || "https://gamingsoft.atlassian.net",
+      weekly: saved.weekly && typeof saved.weekly === "object" ? saved.weekly : {}
+    };
+  } catch {
+    return { defaultAssignee: "Edward", jiraBaseUrl: "https://gamingsoft.atlassian.net", weekly: {} };
+  }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function showToast(message) {
+  const toast = byId("toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+}
+
+function unique(values) {
+  return Array.from(new Set(values));
+}
+
+function fillSelect(select, values, selected) {
+  select.textContent = "";
+  values.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.appendChild(option);
+  });
+  if (values.includes(selected)) select.value = selected;
+}
+
+function deriveMemberUrl(agentUrl) {
+  try {
+    const url = new URL(agentUrl);
+    url.hostname = url.hostname.replace(/^agent-/, "").replace(/-dev(?=\.)/, "");
+    url.pathname = "/";
+    url.hash = "";
+    url.search = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+function refreshBugSites(preferredSite) {
+  const env = byId("bugEnv").value;
+  const codes = unique(SITES.filter((site) => site.env === env).map((site) => site.code));
+  const fallback = env === "STG" && codes.includes("set_r017｜R017") ? "set_r017｜R017" : codes[0];
+  fillSelect(byId("bugSite"), codes, preferredSite || byId("bugSite").value || fallback);
+  refreshBugUrls();
+}
+
+function refreshBugUrls(preferredUrl) {
+  const env = byId("bugEnv").value;
+  const code = byId("bugSite").value;
+  const matches = SITES.filter((site) => site.env === env && site.code === code);
+  const select = byId("bugAgentUrl");
+  select.textContent = "";
+  matches.forEach((site) => {
+    const option = document.createElement("option");
+    option.value = site.url;
+    option.textContent = site.url;
+    select.appendChild(option);
+  });
+  if (preferredUrl && matches.some((site) => site.url === preferredUrl)) select.value = preferredUrl;
+  byId("bugMemberUrl").value = deriveMemberUrl(select.value);
+}
+
+function getTitleSiteLabel(siteCode, memberUrl) {
+  const code = siteCode.includes("｜") ? siteCode.split("｜").pop().trim() : siteCode.trim();
+  if (code !== "R017") return code;
+  try {
+    return new URL(memberUrl).hostname.toLowerCase() === "gsi2.gsiwl.com" ? "新架構" : code;
+  } catch {
+    return code;
+  }
+}
+
+function normalizeIssueNumber(value) {
+  const match = String(value || "").match(/(?:GSI-)?(\d+)/i);
+  return match ? match[1] : "";
+}
+
+function buildBugOutput() {
+  const env = byId("bugEnv").value;
+  const site = byId("bugSite").value;
+  const agentUrl = byId("bugAgentUrl").value;
+  const memberUrl = byId("bugMemberUrl").value;
+  const account = byId("bugMemberAccount").value.trim();
+  const password = byId("bugMemberPassword").value.trim();
+  const assignee = byId("bugAssignee").value;
+  const parent = normalizeIssueNumber(byId("bugParent").value);
+  const seed = byId("bugTitleSeed").value.trim();
+  const problem = byId("bugProblem").value.trim();
+  const steps = byId("bugSteps").value.trim();
+  const actual = byId("bugActual").value.trim();
+  const expected = byId("bugExpected").value.trim();
+  const title = `[BUG][${env}][${getTitleSiteLabel(site, memberUrl)}]${seed}`;
+  const content = [
+    "基本信息",
+    `環境：${env}`,
+    `版型：${site}`,
+    `代理端地址：${agentUrl}`,
+    `會員端地址：${memberUrl}`,
+    `會員帳號：${account}　　會員密碼：${password}`,
+    "",
+    "問題描述：",
+    problem,
+    "",
+    "操作步驟：",
+    steps,
+    "",
+    "實際結果：",
+    actual,
+    "",
+    "預期結果：",
+    expected
+  ].join("\n");
+  byId("bugOutputTitle").value = title;
+  byId("bugOutputContent").value = content;
+  byId("bugOutputState").textContent = "已產生";
+  byId("bugOutputState").classList.add("ready");
+  byId("bugMeta").textContent = `受託人：${assignee}｜主單：${parent ? `GSI-${parent}` : "未設定"}`;
+  showToast("Jira 草稿已產生");
+}
+
+function resetBug() {
+  ["bugTitleSeed", "bugProblem", "bugSteps", "bugActual", "bugExpected", "bugParent"].forEach((id) => { byId(id).value = ""; });
+  byId("bugOutputTitle").value = "";
+  byId("bugOutputContent").value = "";
+  byId("bugOutputState").textContent = "尚未產生";
+  byId("bugOutputState").classList.remove("ready");
+  byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：未設定`;
+}
+
+async function copyValue(id) {
+  const field = byId(id);
+  const value = field?.value || field?.textContent || "";
+  if (!value) {
+    showToast("目前沒有可複製的內容");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    field.focus();
+    field.select?.();
+    document.execCommand("copy");
+  }
+  showToast("已複製到剪貼簿");
+}
+
+function getWeekDates(value) {
+  const base = value ? new Date(`${value}T12:00:00`) : new Date();
+  const offset = base.getDay() === 0 ? -6 : 1 - base.getDay();
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + offset);
+  return Array.from({ length: 5 }, (_, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    return date;
+  });
+}
+
+function dateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function shortDate(date) {
+  return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function currentWeekKey() {
+  return dateKey(getWeekDates(byId("weeklyDate").value)[0]);
+}
+
+function currentWeeklyData() {
+  const key = currentWeekKey();
+  if (!state.weekly[key]) state.weekly[key] = { reporter: "", items: [], output: "" };
+  return state.weekly[key];
+}
+
+function extractSources(raw) {
+  const sources = [];
+  const jiraMatches = String(raw || "").match(/(?:https?:\/\/[^\s]*\/browse\/)?GSI-\d+|\b\d+\b/gi) || [];
+  jiraMatches.forEach((match) => {
+    const number = normalizeIssueNumber(match);
+    if (number) sources.push({ type: "jira", key: `GSI-${number}`, url: `${state.jiraBaseUrl.replace(/\/$/, "")}/browse/GSI-${number}` });
+  });
+  const urlMatches = String(raw || "").match(/https?:\/\/[^\s<>"]+/gi) || [];
+  urlMatches.forEach((url) => {
+    if (/notion\.(?:com|site)/i.test(url)) sources.push({ type: "notion", key: "Notion", url: url.replace(/[),，。]+$/, "") });
+  });
+  return sources.filter((source, index, all) => all.findIndex((item) => item.url === source.url) === index);
+}
+
+function addWeeklySources() {
+  const sources = extractSources(byId("weeklySources").value);
+  if (!sources.length) {
+    showToast("請輸入 Jira 單號或 Notion 網址");
+    return;
+  }
+  const data = currentWeeklyData();
+  let added = 0;
+  sources.forEach((source) => {
+    if (data.items.some((item) => item.url === source.url)) return;
+    data.items.push({
+      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      ...source,
+      summary: source.type === "jira" ? `${source.key}｜待讀取 Jira 標題` : "Notion｜待讀取頁面標題",
+      status: "待串接 API",
+      group: "其他／待處理"
+    });
+    added += 1;
+  });
+  byId("weeklySources").value = "";
+  saveWeeklyForm();
+  renderWeeklyBoard();
+  generateWeeklyOutput();
+  showToast(added ? `已加入 ${added} 筆資料` : "清單中已有相同資料");
+}
+
+function renderWeeklyBoard() {
+  const board = byId("weeklyBoard");
+  const data = currentWeeklyData();
+  board.textContent = "";
+  WEEKLY_GROUPS.forEach((group) => {
+    const section = document.createElement("section");
+    section.className = "weekly-group";
+    const items = data.items.filter((item) => item.group === group);
+    const head = document.createElement("div");
+    head.className = "weekly-group-head";
+    const title = document.createElement("h3");
+    title.textContent = group;
+    const count = document.createElement("span");
+    count.className = "weekly-count";
+    count.textContent = items.length;
+    head.append(title, count);
+    section.appendChild(head);
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "weekly-empty";
+      empty.textContent = "目前無項目";
+      section.appendChild(empty);
+    } else {
+      const list = document.createElement("div");
+      list.className = "weekly-items";
+      items.forEach((item) => list.appendChild(createWeeklyItem(item)));
+      section.appendChild(list);
+    }
+    board.appendChild(section);
+  });
+}
+
+function createWeeklyItem(item) {
+  const wrap = document.createElement("div");
+  wrap.className = "weekly-item";
+  const top = document.createElement("div");
+  top.className = "weekly-item-top";
+  const source = document.createElement("a");
+  source.className = "weekly-source";
+  source.href = item.url;
+  source.target = "_blank";
+  source.rel = "noopener noreferrer";
+  source.textContent = item.key;
+  const remove = document.createElement("button");
+  remove.className = "remove-item";
+  remove.type = "button";
+  remove.textContent = "移除";
+  remove.addEventListener("click", () => {
+    const data = currentWeeklyData();
+    data.items = data.items.filter((entry) => entry.id !== item.id);
+    saveWeeklyForm();
+    renderWeeklyBoard();
+    generateWeeklyOutput();
+  });
+  top.append(source, remove);
+  wrap.appendChild(top);
+
+  const summaryLabel = document.createElement("label");
+  summaryLabel.textContent = "標題";
+  const summary = document.createElement("input");
+  summary.value = item.summary;
+  summary.addEventListener("input", () => { item.summary = summary.value; saveWeeklyForm(); });
+  summaryLabel.appendChild(summary);
+
+  const statusLabel = document.createElement("label");
+  statusLabel.textContent = "狀態";
+  const status = document.createElement("input");
+  status.value = item.status;
+  status.addEventListener("input", () => { item.status = status.value; saveWeeklyForm(); });
+  statusLabel.appendChild(status);
+
+  const groupLabel = document.createElement("label");
+  groupLabel.textContent = "分類";
+  const groupSelect = document.createElement("select");
+  fillSelect(groupSelect, WEEKLY_GROUPS, item.group);
+  groupSelect.addEventListener("change", () => {
+    item.group = groupSelect.value;
+    saveWeeklyForm();
+    renderWeeklyBoard();
+    generateWeeklyOutput();
+  });
+  groupLabel.appendChild(groupSelect);
+  wrap.append(summaryLabel, statusLabel, groupLabel);
+  return wrap;
+}
+
+function saveWeeklyForm() {
+  const data = currentWeeklyData();
+  data.reporter = byId("weeklyReporter").value.trim();
+  data.output = byId("weeklyOutput").value;
+  saveState();
+}
+
+function loadWeekly() {
+  const dates = getWeekDates(byId("weeklyDate").value);
+  const data = currentWeeklyData();
+  byId("weeklyReporter").value = data.reporter || "";
+  byId("weeklyOutput").value = data.output || "";
+  byId("weeklyRange").textContent = `${shortDate(dates[0])}－${shortDate(dates[4])}`;
+  renderWeeklyBoard();
+}
+
+function generateWeeklyOutput() {
+  const data = currentWeeklyData();
+  const dates = getWeekDates(byId("weeklyDate").value);
+  const lines = [`${shortDate(dates[0])}-${shortDate(dates[4])}`];
+  const reporter = byId("weeklyReporter").value.trim();
+  if (reporter) lines.push("", `人員｜${reporter}`);
+  WEEKLY_GROUPS.forEach((group) => {
+    const items = data.items.filter((item) => item.group === group);
+    if (!items.length) return;
+    lines.push("", `${group}（${items.length}）`);
+    items.forEach((item, index) => lines.push(`${index + 1}. ${item.summary || item.key}｜${item.status || "狀態未填"}`));
+  });
+  byId("weeklyOutput").value = lines.join("\n");
+  saveWeeklyForm();
+}
+
+function clearWeekly() {
+  if (!window.confirm("確定清空本周資料嗎？")) return;
+  state.weekly[currentWeekKey()] = { reporter: "", items: [], output: "" };
+  saveState();
+  loadWeekly();
+  showToast("已清空本周資料");
+}
+
+function initializeAssignees() {
+  fillSelect(byId("bugAssignee"), ASSIGNEES, state.defaultAssignee);
+  fillSelect(byId("defaultAssignee"), ASSIGNEES, state.defaultAssignee);
+  const people = byId("peopleList");
+  ASSIGNEES.forEach((name) => {
+    const chip = document.createElement("span");
+    chip.className = "person-chip";
+    chip.textContent = name;
+    people.appendChild(chip);
+  });
+}
+
+function saveSettings(event) {
+  event.preventDefault();
+  state.defaultAssignee = byId("defaultAssignee").value;
+  state.jiraBaseUrl = byId("jiraBaseUrl").value.trim().replace(/\/$/, "") || "https://gamingsoft.atlassian.net";
+  byId("bugAssignee").value = state.defaultAssignee;
+  saveState();
+  byId("settingsMessage").textContent = "已儲存；下次開啟會自動套用。";
+  showToast("同事設定已儲存");
+}
+
+async function checkHealth() {
+  const result = byId("healthResult");
+  result.textContent = "檢查中...";
+  try {
+    const response = await fetch("/api/health", { headers: { Accept: "application/json" } });
+    const data = await response.json();
+    result.textContent = JSON.stringify(data, null, 2);
+  } catch {
+    result.textContent = "目前使用靜態預覽，Pages Function 會在 Cloudflare 或 Wrangler 環境中啟用。";
+  }
+}
+
+document.querySelectorAll(".nav-item").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item").forEach((item) => item.classList.remove("active"));
+    document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
+    button.classList.add("active");
+    const view = byId(`view-${button.dataset.view}`);
+    view.classList.add("active");
+    byId("pageTitle").textContent = view.dataset.title;
+  });
+});
+
+document.querySelectorAll("[data-copy]").forEach((button) => button.addEventListener("click", () => copyValue(button.dataset.copy)));
+byId("bugForm").addEventListener("submit", (event) => { event.preventDefault(); buildBugOutput(); });
+byId("bugReset").addEventListener("click", resetBug);
+byId("bugEnv").addEventListener("change", () => refreshBugSites());
+byId("bugSite").addEventListener("change", () => refreshBugUrls());
+byId("bugAgentUrl").addEventListener("change", () => { byId("bugMemberUrl").value = deriveMemberUrl(byId("bugAgentUrl").value); });
+byId("bugAssignee").addEventListener("change", () => { byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：未設定`; });
+byId("openJiraCreate").addEventListener("click", () => window.open(`${state.jiraBaseUrl.replace(/\/$/, "")}/secure/CreateIssue.jspa`, "_blank", "noopener"));
+byId("weeklyAdd").addEventListener("click", addWeeklySources);
+byId("weeklyClear").addEventListener("click", clearWeekly);
+byId("weeklyGenerate").addEventListener("click", generateWeeklyOutput);
+byId("weeklyDate").addEventListener("change", loadWeekly);
+byId("weeklyReporter").addEventListener("input", saveWeeklyForm);
+byId("weeklyOutput").addEventListener("input", saveWeeklyForm);
+byId("settingsForm").addEventListener("submit", saveSettings);
+byId("healthCheck").addEventListener("click", checkHealth);
+
+initializeAssignees();
+byId("jiraBaseUrl").value = state.jiraBaseUrl;
+refreshBugSites("set_r017｜R017");
+refreshBugUrls("https://agent-gsi2.gsiwl.com");
+byId("weeklyDate").value = dateKey(new Date());
+loadWeekly();

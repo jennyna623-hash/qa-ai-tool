@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#2563eb">
+  <title>AI 工具 Cloud</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">AI</div>
+        <div>
+          <strong>AI 工具</strong>
+          <span>Cloud V1</span>
+        </div>
+      </div>
+
+      <nav class="nav-list" aria-label="主要功能">
+        <button class="nav-item active" type="button" data-view="bug">
+          <span class="nav-icon">B</span><span>BUG 單模板</span>
+        </button>
+        <button class="nav-item" type="button" data-view="weekly">
+          <span class="nav-icon">W</span><span>周進度</span>
+        </button>
+        <button class="nav-item" type="button" data-view="settings">
+          <span class="nav-icon">S</span><span>同事設定</span>
+        </button>
+        <button class="nav-item" type="button" data-view="cloud">
+          <span class="nav-icon">C</span><span>雲端狀態</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <span class="status-dot"></span>
+        <span>資料暫存於此瀏覽器</span>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">GSI QA WORKSPACE</p>
+          <h1 id="pageTitle">BUG 單模板</h1>
+        </div>
+        <div class="cloud-badge"><span></span>雲端版準備中</div>
+      </header>
+
+      <section class="view active" id="view-bug" data-title="BUG 單模板">
+        <div class="page-intro">
+          <div>
+            <h2>建立標準 Jira BUG 內容</h2>
+            <p>受託人與主單只保存在欄位設定，不會寫進問題描述。</p>
+          </div>
+          <span class="ready-label">Cloud Ready</span>
+        </div>
+
+        <div class="split-layout">
+          <form class="card form-card" id="bugForm">
+            <div class="section-heading">
+              <span>01</span>
+              <div><h3>基本信息</h3><p>依環境與版型自動產生標題及網址。</p></div>
+            </div>
+
+            <div class="form-grid">
+              <label class="field">
+                <span>環境</span>
+                <select id="bugEnv">
+                  <option value="DEV">DEV</option>
+                  <option value="STG" selected>STG</option>
+                  <option value="PROD">PROD</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>版型</span>
+                <select id="bugSite"></select>
+              </label>
+              <label class="field full">
+                <span>代理端地址</span>
+                <select id="bugAgentUrl"></select>
+              </label>
+              <label class="field full">
+                <span>會員端地址</span>
+                <input id="bugMemberUrl" type="url" readonly>
+              </label>
+              <label class="field">
+                <span>會員帳號</span>
+                <input id="bugMemberAccount" type="text" value="jenny5555" autocomplete="off">
+              </label>
+              <label class="field">
+                <span>會員密碼</span>
+                <input id="bugMemberPassword" type="password" placeholder="請由使用者填寫；不會保存" autocomplete="off">
+              </label>
+              <label class="field">
+                <span>受託人</span>
+                <select id="bugAssignee"></select>
+                <small>Jira API 串接後會直接選入受託人欄位。</small>
+              </label>
+              <label class="field">
+                <span>Jira 主單（選填）</span>
+                <div class="prefix-input"><span>GSI-</span><input id="bugParent" inputmode="numeric" placeholder="214"></div>
+              </label>
+              <label class="field full">
+                <span>BUG 標題</span>
+                <input id="bugTitleSeed" type="text" placeholder="例如：處理中訂單列表沒有漸層">
+              </label>
+            </div>
+
+            <div class="section-heading compact">
+              <span>02</span>
+              <div><h3>問題內容</h3><p>請填寫可重現且可驗收的內容。</p></div>
+            </div>
+            <div class="form-grid">
+              <label class="field full"><span>問題描述</span><textarea id="bugProblem" rows="3" placeholder="簡述發生的問題"></textarea></label>
+              <label class="field full"><span>操作步驟</span><textarea id="bugSteps" rows="4" placeholder="1. 進入頁面&#10;2. 執行操作&#10;3. 觀察結果"></textarea></label>
+              <label class="field full"><span>實際結果</span><textarea id="bugActual" rows="3"></textarea></label>
+              <label class="field full"><span>預期結果</span><textarea id="bugExpected" rows="3"></textarea></label>
+            </div>
+
+            <div class="actions">
+              <button class="button primary" type="submit">產生內容</button>
+              <button class="button ghost" type="button" id="bugReset">清空內容</button>
+            </div>
+          </form>
+
+          <div class="output-column">
+            <article class="card output-card sticky-card">
+              <div class="output-head"><div><span>OUTPUT</span><h3>Jira 草稿</h3></div><span id="bugOutputState" class="mini-state">尚未產生</span></div>
+              <label class="field"><span>標題</span><input id="bugOutputTitle" readonly></label>
+              <div class="inline-actions"><button class="button soft" type="button" data-copy="bugOutputTitle">複製標題</button></div>
+              <label class="field"><span>描述</span><textarea id="bugOutputContent" rows="20" readonly></textarea></label>
+              <div class="inline-actions">
+                <button class="button primary" type="button" data-copy="bugOutputContent">複製描述</button>
+                <button class="button ghost" type="button" id="openJiraCreate">開啟 Jira</button>
+              </div>
+              <div class="field-note" id="bugMeta">受託人：Edward｜主單：未設定</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-weekly" data-title="周進度">
+        <div class="page-intro">
+          <div><h2>整理本周工作進度</h2><p>目前可手動分類與輸出；Jira／Notion API 會在第二階段接上。</p></div>
+          <span class="planned-label">API 待串接</span>
+        </div>
+
+        <div class="card">
+          <div class="form-grid weekly-top-grid">
+            <label class="field"><span>參考日期</span><input id="weeklyDate" type="date"></label>
+            <label class="field"><span>填寫人</span><input id="weeklyReporter" type="text" placeholder="例如：Jenny"></label>
+            <label class="field full"><span>Jira 單號或 Notion 網址</span><textarea id="weeklySources" rows="3" placeholder="GSI-86&#10;https://gamingsoft.atlassian.net/browse/GSI-214&#10;Notion 網址"></textarea></label>
+          </div>
+          <div class="actions">
+            <button class="button primary" type="button" id="weeklyAdd">加入清單</button>
+            <button class="button ghost" type="button" id="weeklyClear">清空本周</button>
+          </div>
+          <div class="notice"><strong>第一階段：</strong>新單會先放在「其他／待處理」，可在下方手動選擇分類。串接 Jira 後會依狀態自動歸類。</div>
+        </div>
+
+        <div class="weekly-board" id="weeklyBoard"></div>
+
+        <article class="card output-card">
+          <div class="output-head"><div><span>WEEKLY OUTPUT</span><h3>周進度彙整</h3></div><span id="weeklyRange" class="mini-state"></span></div>
+          <textarea id="weeklyOutput" rows="16" placeholder="加入 Jira／Notion 項目後產生彙整"></textarea>
+          <div class="inline-actions">
+            <button class="button primary" type="button" id="weeklyGenerate">重新整理彙整</button>
+            <button class="button soft" type="button" data-copy="weeklyOutput">複製結果</button>
+          </div>
+        </article>
+      </section>
+
+      <section class="view" id="view-settings" data-title="同事設定">
+        <div class="page-intro">
+          <div><h2>每位同事的個人預設</h2><p>設定只保存在目前瀏覽器，不會上傳帳號或密碼。</p></div>
+          <span class="ready-label">Browser Storage</span>
+        </div>
+        <div class="settings-grid">
+          <form class="card" id="settingsForm">
+            <div class="section-heading"><span>01</span><div><h3>Jira 預設</h3><p>產生 BUG 草稿時自動套用。</p></div></div>
+            <label class="field"><span>預設受託人</span><select id="defaultAssignee"></select></label>
+            <label class="field"><span>Jira 網址</span><input id="jiraBaseUrl" type="url" value="https://gamingsoft.atlassian.net"></label>
+            <div class="actions"><button class="button primary" type="submit">儲存設定</button></div>
+            <div class="save-message" id="settingsMessage" aria-live="polite"></div>
+          </form>
+          <article class="card">
+            <div class="section-heading"><span>02</span><div><h3>受託人清單</h3><p>目前雲端 V1 使用的固定清單。</p></div></div>
+            <div class="people-list" id="peopleList"></div>
+          </article>
+          <article class="card warning-card">
+            <h3>安全提醒</h3>
+            <p>請勿在 GitHub 放入 Jira Token、Notion Token、正式站密碼或任何 <code>.env</code> 檔案。之後的 API 金鑰會存入 Cloudflare Secrets。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="view-cloud" data-title="雲端狀態">
+        <div class="page-intro">
+          <div><h2>Cloudflare 部署狀態</h2><p>這個頁面用來確認哪些功能已可在線上使用。</p></div>
+          <span class="ready-label">V1</span>
+        </div>
+        <div class="status-grid">
+          <article class="status-card done"><span>已完成</span><h3>雲端前端</h3><p>BUG 模板、同事設定、周進度手動彙整及本機瀏覽器保存。</p></article>
+          <article class="status-card next"><span>下一階段</span><h3>Jira API</h3><p>讀取標題與狀態、建立 BUG、選擇受託人及關聯主單。</p></article>
+          <article class="status-card next"><span>下一階段</span><h3>Notion API</h3><p>讀取授權頁面並將內容加入周進度分類。</p></article>
+          <article class="status-card blocked"><span>需改造</span><h3>網站自動登入</h3><p>Cloudflare 無法啟動本機 Chrome；需改用官方 API 或獨立瀏覽器服務。</p></article>
+        </div>
+        <article class="card health-card">
+          <div><h3>Pages Function 健康檢查</h3><p>部署到 Cloudflare 後可確認後端接口是否正常。</p></div>
+          <button class="button primary" type="button" id="healthCheck">執行檢查</button>
+          <pre id="healthResult">尚未檢查</pre>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js" defer></script>
+</body>
+</html>
