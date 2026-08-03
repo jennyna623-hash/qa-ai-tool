@@ -118,6 +118,17 @@
               <label class="field full"><span>操作步驟</span><textarea id="bugSteps" rows="4" placeholder="1. 進入頁面&#10;2. 執行操作&#10;3. 觀察結果"></textarea></label>
               <label class="field full"><span>實際結果</span><textarea id="bugActual" rows="3"></textarea></label>
               <label class="field full"><span>預期結果</span><textarea id="bugExpected" rows="3"></textarea></label>
+              <div class="field full">
+                <span>截圖附件</span>
+                <div class="screenshot-drop" id="bugScreenshotDrop" tabindex="0" role="button" aria-describedby="bugScreenshotHelp">
+                  <input id="bugScreenshotInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+                  <span class="screenshot-drop-icon" aria-hidden="true">＋</span>
+                  <strong>Ctrl+V 直接貼上截圖</strong>
+                  <span>也可以點擊選擇，或將圖片拖曳到這裡</span>
+                </div>
+                <small id="bugScreenshotHelp">支援 PNG、JPG、WEBP、GIF；最多 5 張，每張不超過 5MB。建立 Jira 後會自動上傳附件。</small>
+                <div class="screenshot-list" id="bugScreenshotList" aria-live="polite"></div>
+              </div>
             </div>
 
             <div class="actions">
@@ -216,7 +227,7 @@
         </div>
         <div class="status-grid">
           <article class="status-card done"><span>已完成</span><h3>雲端前端</h3><p>BUG 模板、同事設定、周進度手動彙整及本機瀏覽器保存。</p></article>
-          <article class="status-card done"><span>已完成</span><h3>Jira API</h3><p>OAuth 安全連接、建立 BUG、自動選擇受託人及關聯主單。</p></article>
+          <article class="status-card done"><span>已完成</span><h3>Jira API</h3><p>OAuth 安全連接、建立 BUG、截圖附件、自動選擇受託人及關聯主單。</p></article>
           <article class="status-card next"><span>下一階段</span><h3>Notion API</h3><p>讀取授權頁面並將內容加入周進度分類。</p></article>
           <article class="status-card blocked"><span>需改造</span><h3>網站自動登入</h3><p>Cloudflare 無法啟動本機 Chrome；需改用官方 API 或獨立瀏覽器服務。</p></article>
         </div>

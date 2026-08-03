@@ -1,6 +1,9 @@
 const STORAGE_KEY = "gsi-ai-tools-cloud-v1";
 const WEEKLY_GROUPS = ["DEV 測試中", "STG 測試中", "待修正", "待進版 PROD", "已完成", "其他／待處理"];
 const ASSIGNEES = ["Edward", "corey", "JOSEPH", "偉恩", "Ken", "KevinKao", "Will Zhang", "Simon Wu", "Jason hu"];
+const MAX_BUG_ATTACHMENTS = 5;
+const MAX_BUG_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const BUG_ATTACHMENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 const SITES = [
   { url: "https://agent-bmm1-dev.gsiwl.com", env: "DEV", code: "set_r021｜R021" },
@@ -63,6 +66,7 @@ const byId = (id) => document.getElementById(id);
 const state = loadState();
 let toastTimer;
 let jiraConnection = { configured: false, connected: false };
+let bugAttachments = [];
 
 function loadState() {
   try {
@@ -156,9 +160,91 @@ function normalizeIssueNumber(value) {
   return match ? match[1] : "";
 }
 
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderBugAttachments() {
+  const list = byId("bugScreenshotList");
+  list.textContent = "";
+  bugAttachments.forEach((attachment) => {
+    const item = document.createElement("article");
+    item.className = "screenshot-item";
+
+    const image = document.createElement("img");
+    image.src = attachment.previewUrl;
+    image.alt = attachment.file.name;
+
+    const copy = document.createElement("div");
+    copy.className = "screenshot-item-copy";
+    const name = document.createElement("strong");
+    name.textContent = attachment.file.name;
+    const size = document.createElement("small");
+    size.textContent = formatFileSize(attachment.file.size);
+    copy.append(name, size);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "screenshot-remove";
+    remove.setAttribute("aria-label", `移除 ${attachment.file.name}`);
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+      URL.revokeObjectURL(attachment.previewUrl);
+      bugAttachments = bugAttachments.filter((itemValue) => itemValue.id !== attachment.id);
+      renderBugAttachments();
+      updateBugMeta();
+    });
+
+    item.append(image, copy, remove);
+    list.appendChild(item);
+  });
+}
+
+function addBugAttachments(files) {
+  let added = 0;
+  let rejectedMessage = "";
+  for (const file of Array.from(files || [])) {
+    if (bugAttachments.length >= MAX_BUG_ATTACHMENTS) {
+      rejectedMessage = `最多只能加入 ${MAX_BUG_ATTACHMENTS} 張截圖`;
+      break;
+    }
+    if (!BUG_ATTACHMENT_TYPES.has(String(file.type || "").toLowerCase())) {
+      rejectedMessage = "只支援 PNG、JPG、WEBP 或 GIF 圖片";
+      continue;
+    }
+    if (file.size > MAX_BUG_ATTACHMENT_BYTES) {
+      rejectedMessage = `${file.name || "截圖"} 超過 5MB`;
+      continue;
+    }
+    const duplicate = bugAttachments.some((item) =>
+      item.file.name === file.name && item.file.size === file.size && item.file.lastModified === file.lastModified
+    );
+    if (duplicate) continue;
+    bugAttachments.push({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      file,
+      previewUrl: URL.createObjectURL(file)
+    });
+    added += 1;
+  }
+  renderBugAttachments();
+  updateBugMeta();
+  if (added) showToast(`已加入 ${added} 張截圖`);
+  else if (rejectedMessage) showToast(rejectedMessage);
+}
+
+function clearBugAttachments() {
+  bugAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
+  bugAttachments = [];
+  byId("bugScreenshotInput").value = "";
+  renderBugAttachments();
+}
+
 function updateBugMeta() {
   const parent = normalizeIssueNumber(byId("bugParent").value);
-  byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：${parent ? `GSI-${parent}` : "未設定"}`;
+  byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：${parent ? `GSI-${parent}` : "未設定"}｜附件：${bugAttachments.length} 張`;
 }
 
 function buildBugOutput() {
@@ -212,6 +298,7 @@ function resetBug() {
   byId("bugOutputContent").value = "";
   byId("bugOutputState").textContent = "尚未產生";
   byId("bugOutputState").classList.remove("ready");
+  clearBugAttachments();
   updateBugMeta();
   byId("jiraCreateResult").classList.add("hidden");
 }
@@ -300,6 +387,11 @@ function renderJiraResult(data) {
   link.rel = "noopener noreferrer";
   link.textContent = "開啟 Jira 單";
   result.append(strong, link);
+  if (data.attachmentCount) {
+    const attachment = document.createElement("small");
+    attachment.textContent = `已上傳 ${data.attachmentCount} 張附件`;
+    result.appendChild(attachment);
+  }
   if (Array.isArray(data.warnings) && data.warnings.length) {
     const warning = document.createElement("small");
     warning.textContent = data.warnings.join("；");
@@ -336,6 +428,24 @@ async function createJiraIssue() {
     if (response.status === 401) {
       jiraConnection.connected = false;
       renderJiraConnection();
+    }
+    if (data.ok && bugAttachments.length) {
+      button.textContent = "上傳附件…";
+      const attachmentBody = new FormData();
+      attachmentBody.append("issueKey", data.issueKey);
+      bugAttachments.forEach((attachment) => attachmentBody.append("file", attachment.file, attachment.file.name));
+      const attachmentResponse = await fetch("/api/jira/attachments", {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: attachmentBody
+      });
+      const attachmentData = await attachmentResponse.json().catch(() => ({ ok: false, message: `附件上傳失敗（HTTP ${attachmentResponse.status}）` }));
+      if (attachmentResponse.status === 401) {
+        jiraConnection.connected = false;
+        renderJiraConnection();
+      }
+      if (attachmentData.ok) data.attachmentCount = attachmentData.attachments?.length || bugAttachments.length;
+      else data.warnings = [...(data.warnings || []), attachmentData.message || "附件上傳失敗"];
     }
     renderJiraResult(data);
     showToast(data.ok ? `${data.issueKey} 建立成功` : (data.message || "Jira 建單失敗"));
@@ -627,6 +737,37 @@ byId("bugSite").addEventListener("change", () => refreshBugUrls());
 byId("bugAgentUrl").addEventListener("change", () => { byId("bugMemberUrl").value = deriveMemberUrl(byId("bugAgentUrl").value); });
 byId("bugAssignee").addEventListener("change", updateBugMeta);
 byId("bugParent").addEventListener("input", updateBugMeta);
+byId("bugScreenshotDrop").addEventListener("click", () => byId("bugScreenshotInput").click());
+byId("bugScreenshotDrop").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    byId("bugScreenshotInput").click();
+  }
+});
+byId("bugScreenshotInput").addEventListener("change", (event) => {
+  addBugAttachments(event.target.files);
+  event.target.value = "";
+});
+byId("bugScreenshotDrop").addEventListener("dragover", (event) => {
+  event.preventDefault();
+  byId("bugScreenshotDrop").classList.add("dragging");
+});
+byId("bugScreenshotDrop").addEventListener("dragleave", () => byId("bugScreenshotDrop").classList.remove("dragging"));
+byId("bugScreenshotDrop").addEventListener("drop", (event) => {
+  event.preventDefault();
+  byId("bugScreenshotDrop").classList.remove("dragging");
+  addBugAttachments(event.dataTransfer?.files);
+});
+document.addEventListener("paste", (event) => {
+  if (!byId("view-bug").classList.contains("active")) return;
+  const files = Array.from(event.clipboardData?.items || [])
+    .filter((item) => item.kind === "file" && String(item.type || "").startsWith("image/"))
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+  if (!files.length) return;
+  event.preventDefault();
+  addBugAttachments(files);
+});
 byId("jiraConnect").addEventListener("click", connectJira);
 byId("jiraDisconnect").addEventListener("click", disconnectJira);
 byId("jiraCreateIssue").addEventListener("click", createJiraIssue);
@@ -641,6 +782,7 @@ byId("settingsForm").addEventListener("submit", saveSettings);
 byId("healthCheck").addEventListener("click", checkHealth);
 
 initializeAssignees();
+updateBugMeta();
 consumeJiraRedirectResult();
 byId("jiraBaseUrl").value = state.jiraBaseUrl;
 refreshBugSites("set_r017｜R017");
