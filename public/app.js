@@ -1067,6 +1067,7 @@ document.querySelectorAll(".nav-item").forEach((button) => {
     const view = byId(`view-${button.dataset.view}`);
     view.classList.add("active");
     byId("pageTitle").textContent = view.dataset.title;
+    window.scrollTo(0, 0);
   });
 });
 
