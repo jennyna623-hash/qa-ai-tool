@@ -463,7 +463,13 @@ function buildBugDescription(useImageMarkers = false) {
   ].join("\n");
 }
 
-function buildBugOutput() {
+function buildBugOutput({ silent = false } = {}) {
+  const password = byId("bugMemberPassword").value.trim();
+  if (!password) {
+    byId("bugMemberPassword").focus();
+    showToast("請先填寫會員密碼");
+    return false;
+  }
   const env = byId("bugEnv").value;
   const site = byId("bugSite").value;
   const memberUrl = byId("bugMemberUrl").value;
@@ -478,11 +484,14 @@ function buildBugOutput() {
   updateBugMeta();
   byId("jiraCreateResult").classList.add("hidden");
   byId("jiraCreateResult").textContent = "";
-  showToast("Jira 草稿已產生");
+  if (!silent) showToast("Jira 草稿已產生");
+  return true;
 }
 
 function resetBug() {
-  ["bugTitleSeed", "bugSteps", "bugParent"].forEach((id) => { byId(id).value = ""; });
+  ["bugTitleSeed", "bugParent"].forEach((id) => { byId(id).value = ""; });
+  byId("bugSteps").value = "1. ";
+  byId("bugMemberPassword").value = "";
   byId("bugActual").innerHTML = "";
   byId("bugExpected").innerHTML = "";
   byId("bugOutputTitle").value = "";
@@ -598,12 +607,17 @@ function renderJiraResult(data) {
 }
 
 async function createJiraIssue() {
+  if (!byId("bugMemberPassword").value.trim()) {
+    byId("bugMemberPassword").focus();
+    showToast("請先填寫會員密碼");
+    return;
+  }
   if (!jiraConnection.connected) {
     if (jiraConnection.configured) connectJira();
     else showToast(jiraConnection.message || "請先完成 Jira OAuth 設定");
     return;
   }
-  if (!byId("bugOutputTitle").value || !byId("bugOutputContent").value) buildBugOutput();
+  if (!buildBugOutput({ silent: true })) return;
 
   const button = byId("jiraCreateIssue");
   const originalText = button.textContent;
@@ -1243,8 +1257,30 @@ byId("bugReset").addEventListener("click", resetBug);
 byId("bugEnv").addEventListener("change", () => refreshBugSites());
 byId("bugSite").addEventListener("change", () => refreshBugUrls());
 byId("bugAgentUrl").addEventListener("change", () => { byId("bugMemberUrl").value = deriveMemberUrl(byId("bugAgentUrl").value); });
+byId("bugMemberPassword").addEventListener("input", () => {
+  if (!byId("bugOutputContent").value) return;
+  byId("bugOutputContent").value = buildBugDescription();
+  renderBugOutputPreview();
+});
 byId("bugAssignee").addEventListener("change", updateBugMeta);
 byId("bugParent").addEventListener("input", updateBugMeta);
+byId("bugSteps").addEventListener("focus", (event) => {
+  if (!event.currentTarget.value.trim()) event.currentTarget.value = "1. ";
+});
+byId("bugSteps").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  const field = event.currentTarget;
+  const start = field.selectionStart;
+  const end = field.selectionEnd;
+  const lineStart = field.value.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+  const currentLine = field.value.slice(lineStart, start);
+  const match = currentLine.match(/^\s*(\d+)\.\s?.*$/);
+  if (!match) return;
+  event.preventDefault();
+  const nextNumber = Number(match[1]) + 1;
+  field.setRangeText(`\n${nextNumber}. `, start, end, "end");
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+});
 function bindResultEditor(section) {
   const editor = getResultEditor(section);
   const pasteInput = byId(section === "expected" ? "bugExpectedPasteInput" : "bugActualPasteInput");

@@ -95,7 +95,8 @@
               </label>
               <label class="field">
                 <span>會員密碼</span>
-                <input id="bugMemberPassword" type="password" placeholder="請由使用者填寫；不會保存" autocomplete="off">
+                <input id="bugMemberPassword" type="text" placeholder="請輸入會員密碼" autocomplete="off" spellcheck="false" required>
+                <small>密碼會直接顯示，並以明文寫入 Jira BUG 描述。</small>
               </label>
               <label class="field">
                 <span>受託人</span>
@@ -119,7 +120,7 @@
               <div><h3>問題內容</h3><p>請填寫可重現且可驗收的內容。</p></div>
             </div>
             <div class="form-grid">
-              <label class="field full"><span>操作步驟</span><textarea id="bugSteps" rows="4" placeholder="1. 進入頁面&#10;2. 執行操作&#10;3. 觀察結果"></textarea></label>
+              <label class="field full"><span>操作步驟</span><textarea id="bugSteps" rows="4" placeholder="1. 進入頁面&#10;2. 執行操作&#10;3. 觀察結果">1. </textarea><small>按 Enter 會自動接續下一個編號。</small></label>
               <div class="field full">
                 <span id="bugActualLabel">實際結果</span>
                 <div class="result-rich-editor" id="bugActual" data-screenshot-section="actual" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="bugActualLabel" data-placeholder="輸入文字，或直接 Ctrl+V 貼上圖片"></div>
