@@ -25,7 +25,7 @@
 將程式碼放到 GitHub 私人 Repository 後，在 Cloudflare 建立 Pages 專案：
 
 - Framework preset：`None`
-- Root directory：`cloud-app`
+- Root directory：留空（Repository 根目錄就是本專案）
 - Build command：留空
 - Build output directory：`public`
 
