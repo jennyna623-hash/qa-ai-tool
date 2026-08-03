@@ -100,8 +100,9 @@
                 <small>Jira API 串接後會直接選入受託人欄位。</small>
               </label>
               <label class="field">
-                <span>Jira 主單（選填）</span>
+                <span>鏈接主單（選填）</span>
                 <div class="prefix-input"><span>GSI-</span><input id="bugParent" inputmode="numeric" placeholder="214"></div>
+                <small>預設關係：is blocked by</small>
               </label>
               <label class="field full">
                 <span>BUG 標題</span>
@@ -163,13 +164,19 @@
               </div>
               <label class="field"><span>標題</span><input id="bugOutputTitle" readonly></label>
               <div class="inline-actions"><button class="button soft" type="button" data-copy="bugOutputTitle">複製標題</button></div>
-              <label class="field"><span>描述</span><textarea id="bugOutputContent" rows="20" readonly></textarea></label>
+              <div class="field">
+                <span>描述</span>
+                <div class="jira-description-preview" id="bugOutputPreview" aria-live="polite">
+                  <p class="description-preview-empty">產生內容後，文字與使用的圖片會顯示在這裡。</p>
+                </div>
+                <textarea id="bugOutputContent" hidden readonly></textarea>
+              </div>
               <div class="inline-actions">
                 <button class="button primary" type="button" id="jiraCreateIssue">建立 Jira BUG</button>
                 <button class="button soft" type="button" data-copy="bugOutputContent">複製描述</button>
                 <button class="button ghost" type="button" id="openJiraCreate">開啟 Jira</button>
               </div>
-              <div class="field-note" id="bugMeta">受託人：Edward｜主單：未設定</div>
+              <div class="field-note" id="bugMeta">受託人：Edward｜鏈接主單：未設定｜實際結果圖片：0 張｜預期結果圖片：0 張</div>
               <div class="jira-result hidden" id="jiraCreateResult" aria-live="polite"></div>
             </article>
           </div>

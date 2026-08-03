@@ -194,6 +194,7 @@ function renderBugAttachmentSection(section) {
       URL.revokeObjectURL(attachment.previewUrl);
       bugAttachments = bugAttachments.filter((itemValue) => itemValue.id !== attachment.id);
       renderBugAttachmentSection(section);
+      renderBugOutputPreview();
       updateBugMeta();
     });
 
@@ -237,6 +238,7 @@ function addBugAttachments(files, section = "actual") {
     added += 1;
   }
   renderBugAttachments();
+  renderBugOutputPreview();
   updateBugMeta();
   if (added) showToast(`已加入 ${added} 張截圖`);
   else if (rejectedMessage) showToast(rejectedMessage);
@@ -254,7 +256,73 @@ function updateBugMeta() {
   const parent = normalizeIssueNumber(byId("bugParent").value);
   const actualCount = bugAttachments.filter((attachment) => attachment.section === "actual").length;
   const expectedCount = bugAttachments.filter((attachment) => attachment.section === "expected").length;
-  byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：${parent ? `GSI-${parent}` : "未設定"}｜實際結果圖片：${actualCount} 張｜預期結果圖片：${expectedCount} 張`;
+  byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜鏈接主單：${parent ? `is blocked by GSI-${parent}` : "未設定"}｜實際結果圖片：${actualCount} 張｜預期結果圖片：${expectedCount} 張`;
+}
+
+function appendPreviewSection(preview, title, text, attachments = []) {
+  const section = document.createElement("section");
+  section.className = "description-preview-section";
+  const heading = document.createElement("h4");
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  const copy = document.createElement("p");
+  copy.className = "description-preview-copy";
+  copy.textContent = text || "—";
+  section.appendChild(copy);
+
+  if (attachments.length) {
+    const gallery = document.createElement("div");
+    gallery.className = "description-preview-gallery";
+    attachments.forEach((attachment, index) => {
+      const figure = document.createElement("figure");
+      const image = document.createElement("img");
+      image.src = attachment.previewUrl;
+      image.alt = attachment.file.name || `${title}圖片 ${index + 1}`;
+      const caption = document.createElement("figcaption");
+      caption.textContent = attachment.file.name || `${title}圖片 ${index + 1}`;
+      figure.append(image, caption);
+      gallery.appendChild(figure);
+    });
+    section.appendChild(gallery);
+  }
+  preview.appendChild(section);
+}
+
+function renderBugOutputPreview() {
+  const preview = byId("bugOutputPreview");
+  if (!preview) return;
+  preview.textContent = "";
+  if (!byId("bugOutputContent").value) {
+    const empty = document.createElement("p");
+    empty.className = "description-preview-empty";
+    empty.textContent = "產生內容後，文字與使用的圖片會顯示在這裡。";
+    preview.appendChild(empty);
+    return;
+  }
+
+  const basicInfo = [
+    `環境：${byId("bugEnv").value}`,
+    `版型：${byId("bugSite").value}`,
+    `代理端地址：${byId("bugAgentUrl").value}`,
+    `會員端地址：${byId("bugMemberUrl").value}`,
+    `會員帳號：${byId("bugMemberAccount").value.trim()}　　會員密碼：${byId("bugMemberPassword").value.trim()}`
+  ].join("\n");
+  appendPreviewSection(preview, "基本信息", basicInfo);
+  appendPreviewSection(preview, "問題描述", byId("bugProblem").value.trim());
+  appendPreviewSection(preview, "操作步驟", byId("bugSteps").value.trim());
+  appendPreviewSection(
+    preview,
+    "實際結果",
+    byId("bugActual").value.trim(),
+    bugAttachments.filter((attachment) => attachment.section === "actual")
+  );
+  appendPreviewSection(
+    preview,
+    "預期結果",
+    byId("bugExpected").value.trim(),
+    bugAttachments.filter((attachment) => attachment.section === "expected")
+  );
 }
 
 function buildBugOutput() {
@@ -294,6 +362,7 @@ function buildBugOutput() {
   ].join("\n");
   byId("bugOutputTitle").value = title;
   byId("bugOutputContent").value = content;
+  renderBugOutputPreview();
   byId("bugOutputState").textContent = "已產生";
   byId("bugOutputState").classList.add("ready");
   updateBugMeta();
@@ -306,6 +375,7 @@ function resetBug() {
   ["bugTitleSeed", "bugProblem", "bugSteps", "bugActual", "bugExpected", "bugParent"].forEach((id) => { byId(id).value = ""; });
   byId("bugOutputTitle").value = "";
   byId("bugOutputContent").value = "";
+  renderBugOutputPreview();
   byId("bugOutputState").textContent = "尚未產生";
   byId("bugOutputState").classList.remove("ready");
   clearBugAttachments();
