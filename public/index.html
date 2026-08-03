@@ -275,7 +275,8 @@
 
         <article class="card output-card">
           <div class="output-head"><div><span>WEEKLY OUTPUT</span><h3>周進度彙整</h3></div><span id="weeklyRange" class="mini-state"></span></div>
-          <textarea id="weeklyOutput" rows="16" placeholder="加入 Jira 項目後產生彙整"></textarea>
+          <div id="weeklyOutputPreview" class="weekly-output-preview" aria-label="周進度彙整內容"></div>
+          <textarea id="weeklyOutput" class="weekly-output-source" aria-hidden="true" tabindex="-1"></textarea>
           <div class="inline-actions">
             <button class="button primary" type="button" id="weeklyGenerate">重新整理彙整</button>
             <button class="button soft" type="button" id="weeklyCopy">複製 TG 格式</button>

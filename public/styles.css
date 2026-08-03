@@ -164,6 +164,15 @@ input[readonly], textarea[readonly] { background: #f8fafc; }
 .output-field-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .output-field-head > span { color: var(--text); font-size: 12px; font-weight: 750; }
 .output-field-head .button { min-height: 34px; padding: 7px 13px; }
+.weekly-output-source { display: none; }
+.weekly-output-preview {
+  min-height: 380px; padding: 14px 12px; overflow-wrap: anywhere; white-space: normal;
+  border: 1px solid #d0d5dd; border-radius: 10px; background: #fff; color: var(--text);
+  line-height: 1.6;
+}
+.weekly-output-preview a { color: var(--primary); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.weekly-output-preview a:hover { color: var(--primary-dark); }
+.weekly-output-preview .description-preview-empty { color: #98a2b3; }
 .mini-state { padding: 6px 9px; border-radius: 8px; color: var(--muted); background: #f2f4f7; font-size: 11px; font-weight: 800; }
 .mini-state.ready { color: var(--success); background: var(--success-soft); }
 .field-note { margin-top: 16px; padding: 11px 12px; border-radius: 10px; color: var(--muted); background: #f8fafc; font-size: 12px; line-height: 1.5; }

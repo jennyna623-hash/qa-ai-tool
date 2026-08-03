@@ -8,7 +8,7 @@
 - 只有會員端 `https://gsi2.gsiwl.com/` 自動使用 `[新架構]` 標題；其他 R017 站點使用 `[R017]`
 - 固定受託人清單，預設 Edward
 - 受託人與主單不寫入描述
-- 周進度輸入 Jira 單號後，自動讀取標題、狀態與分類，也可手動新增「標題＋連結」並複製為 Telegram 超連結格式；填寫人可選 Jenny、Ben 或 Guan
+- 周進度輸入 Jira 單號後，自動讀取標題、狀態與分類，也可手動新增「標題＋連結」；彙整區會直接顯示可點擊連結，並可複製為 Telegram 超連結格式；填寫人可選 Jenny、Ben 或 Guan
 - 每位同事的瀏覽器個人設定
 - Cloudflare Pages Function 健康檢查
 - Atlassian OAuth 2.0 安全連接

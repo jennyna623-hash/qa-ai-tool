@@ -1112,8 +1112,25 @@ function loadWeekly() {
   const data = currentWeeklyData();
   byId("weeklyReporter").value = WEEKLY_REPORTERS.includes(data.reporter) ? data.reporter : "Jenny";
   byId("weeklyOutput").value = data.output || "";
+  renderWeeklyOutputPreview(data.output || "");
   byId("weeklyRange").textContent = `${shortDate(dates[0])}－${shortDate(dates[4])}`;
   renderWeeklyBoard();
+}
+
+function renderWeeklyOutputPreview(raw) {
+  const preview = byId("weeklyOutputPreview");
+  preview.textContent = "";
+  if (!String(raw || "").trim()) {
+    const empty = document.createElement("p");
+    empty.className = "description-preview-empty";
+    empty.textContent = "加入 Jira 或手動項目後，帶連結的周進度會顯示在這裡。";
+    preview.appendChild(empty);
+    return;
+  }
+  String(raw).split(/\r?\n/).forEach((line, index, lines) => {
+    if (line) appendMarkdownLine(preview, line);
+    if (index < lines.length - 1) preview.appendChild(document.createElement("br"));
+  });
 }
 
 function generateWeeklyOutput() {
@@ -1133,7 +1150,9 @@ function generateWeeklyOutput() {
       lines.push(`${index + 1}. ${linkedTitle}${status}`);
     });
   });
-  byId("weeklyOutput").value = lines.join("\n");
+  const output = lines.join("\n");
+  byId("weeklyOutput").value = output;
+  renderWeeklyOutputPreview(output);
   saveWeeklyForm();
 }
 
