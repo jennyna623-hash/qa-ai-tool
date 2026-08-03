@@ -104,9 +104,9 @@
                 <small>Jira API 串接後會直接選入受託人欄位。</small>
               </label>
               <label class="field">
-                <span>鏈接主單（選填）</span>
+                <span>is blocked by 主單（選填）</span>
                 <div class="prefix-input"><span>GSI-</span><input id="bugParent" inputmode="numeric" placeholder="214"></div>
-                <small>預設關係：is blocked by</small>
+                <small>建立 BUG 後會自動以 is blocked by 關係連結此主單。</small>
               </label>
               <label class="field full">
                 <span>BUG 標題</span>
@@ -177,23 +177,23 @@
               </div>
               <div class="field-note" id="bugMeta">受託人：Edward｜鏈接主單：未設定｜實際結果圖片：0 張｜預期結果圖片：0 張</div>
               <div class="jira-result hidden" id="jiraCreateResult" aria-live="polite"></div>
-            </article>
-            <article class="card output-card bug-telegram-card hidden" id="bugTelegramCard">
-              <div class="output-head">
-                <div><span>TG OUTPUT</span><h3>BUG 回報內容</h3></div>
-                <span id="bugTelegramState" class="mini-state">尚未建立</span>
-              </div>
-              <div class="report-message-card">
-                <div class="report-toolbar">
-                  <button class="button ghost" id="bugTelegramEdit" type="button">編輯</button>
-                  <button class="button soft" id="bugTelegramCopy" type="button">複製到 TG</button>
+              <section class="bug-telegram-section" id="bugTelegramCard" aria-live="polite">
+                <div class="output-head">
+                  <div><span>TG OUTPUT</span><h3>Telegram 回報草稿</h3></div>
+                  <span id="bugTelegramState" class="mini-state">尚未產生</span>
                 </div>
-                <div class="report-preview bug-telegram-preview" id="bugTelegramPreview">
-                  <p class="description-preview-empty">Jira BUG 建立成功後會自動產生。</p>
+                <div class="report-message-card">
+                  <div class="report-toolbar">
+                    <button class="button ghost" id="bugTelegramEdit" type="button" disabled>編輯</button>
+                    <button class="button soft" id="bugTelegramCopy" type="button" disabled>複製到 TG</button>
+                  </div>
+                  <div class="report-preview bug-telegram-preview" id="bugTelegramPreview">
+                    <p class="description-preview-empty">Jira BUG 建立成功後會自動產生。</p>
+                  </div>
+                  <textarea class="report-editor hidden" id="bugTelegramOutput" rows="7"></textarea>
                 </div>
-                <textarea class="report-editor hidden" id="bugTelegramOutput" rows="7"></textarea>
-              </div>
-              <div class="field-note" id="bugTelegramMeta">尚未建立 Jira BUG。</div>
+                <div class="field-note" id="bugTelegramMeta">尚未建立 Jira BUG。</div>
+              </section>
             </article>
           </div>
         </div>
