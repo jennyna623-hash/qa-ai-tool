@@ -1,7 +1,7 @@
 const STORAGE_KEY = "gsi-ai-tools-cloud-v1";
 const WEEKLY_GROUPS = ["DEV 測試中", "STG 測試中", "待修正", "待進版 PROD", "已完成", "其他／待處理"];
 const ASSIGNEES = ["Edward", "corey", "JOSEPH", "偉恩", "Ken", "KevinKao", "Will Zhang", "Simon Wu", "Jason hu"];
-const MAX_BUG_ATTACHMENTS = 5;
+const MAX_BUG_ATTACHMENTS_PER_SECTION = 5;
 const MAX_BUG_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const BUG_ATTACHMENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
@@ -166,10 +166,10 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function renderBugAttachments() {
-  const list = byId("bugScreenshotList");
+function renderBugAttachmentSection(section) {
+  const list = byId(section === "expected" ? "bugExpectedScreenshotList" : "bugActualScreenshotList");
   list.textContent = "";
-  bugAttachments.forEach((attachment) => {
+  bugAttachments.filter((attachment) => attachment.section === section).forEach((attachment) => {
     const item = document.createElement("article");
     item.className = "screenshot-item";
 
@@ -193,7 +193,7 @@ function renderBugAttachments() {
     remove.addEventListener("click", () => {
       URL.revokeObjectURL(attachment.previewUrl);
       bugAttachments = bugAttachments.filter((itemValue) => itemValue.id !== attachment.id);
-      renderBugAttachments();
+      renderBugAttachmentSection(section);
       updateBugMeta();
     });
 
@@ -202,12 +202,18 @@ function renderBugAttachments() {
   });
 }
 
-function addBugAttachments(files) {
+function renderBugAttachments() {
+  renderBugAttachmentSection("actual");
+  renderBugAttachmentSection("expected");
+}
+
+function addBugAttachments(files, section = "actual") {
   let added = 0;
   let rejectedMessage = "";
   for (const file of Array.from(files || [])) {
-    if (bugAttachments.length >= MAX_BUG_ATTACHMENTS) {
-      rejectedMessage = `最多只能加入 ${MAX_BUG_ATTACHMENTS} 張截圖`;
+    const sectionCount = bugAttachments.filter((attachment) => attachment.section === section).length;
+    if (sectionCount >= MAX_BUG_ATTACHMENTS_PER_SECTION) {
+      rejectedMessage = `每個結果區塊最多只能加入 ${MAX_BUG_ATTACHMENTS_PER_SECTION} 張截圖`;
       break;
     }
     if (!BUG_ATTACHMENT_TYPES.has(String(file.type || "").toLowerCase())) {
@@ -219,11 +225,12 @@ function addBugAttachments(files) {
       continue;
     }
     const duplicate = bugAttachments.some((item) =>
-      item.file.name === file.name && item.file.size === file.size && item.file.lastModified === file.lastModified
+      item.section === section && item.file.name === file.name && item.file.size === file.size && item.file.lastModified === file.lastModified
     );
     if (duplicate) continue;
     bugAttachments.push({
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      section,
       file,
       previewUrl: URL.createObjectURL(file)
     });
@@ -238,13 +245,16 @@ function addBugAttachments(files) {
 function clearBugAttachments() {
   bugAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
   bugAttachments = [];
-  byId("bugScreenshotInput").value = "";
+  byId("bugActualScreenshotInput").value = "";
+  byId("bugExpectedScreenshotInput").value = "";
   renderBugAttachments();
 }
 
 function updateBugMeta() {
   const parent = normalizeIssueNumber(byId("bugParent").value);
-  byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：${parent ? `GSI-${parent}` : "未設定"}｜附件：${bugAttachments.length} 張`;
+  const actualCount = bugAttachments.filter((attachment) => attachment.section === "actual").length;
+  const expectedCount = bugAttachments.filter((attachment) => attachment.section === "expected").length;
+  byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：${parent ? `GSI-${parent}` : "未設定"}｜實際結果圖片：${actualCount} 張｜預期結果圖片：${expectedCount} 張`;
 }
 
 function buildBugOutput() {
@@ -389,7 +399,7 @@ function renderJiraResult(data) {
   result.append(strong, link);
   if (data.attachmentCount) {
     const attachment = document.createElement("small");
-    attachment.textContent = `已上傳 ${data.attachmentCount} 張附件`;
+    attachment.textContent = `已上傳 ${data.attachmentCount} 張附件；${data.embeddedCount || 0} 張已顯示於對應結果`;
     result.appendChild(attachment);
   }
   if (Array.isArray(data.warnings) && data.warnings.length) {
@@ -433,7 +443,11 @@ async function createJiraIssue() {
       button.textContent = "上傳附件…";
       const attachmentBody = new FormData();
       attachmentBody.append("issueKey", data.issueKey);
-      bugAttachments.forEach((attachment) => attachmentBody.append("file", attachment.file, attachment.file.name));
+      attachmentBody.append("description", byId("bugOutputContent").value);
+      bugAttachments.forEach((attachment) => {
+        const field = attachment.section === "expected" ? "expectedFile" : "actualFile";
+        attachmentBody.append(field, attachment.file, attachment.file.name);
+      });
       const attachmentResponse = await fetch("/api/jira/attachments", {
         method: "POST",
         headers: { Accept: "application/json" },
@@ -444,7 +458,11 @@ async function createJiraIssue() {
         jiraConnection.connected = false;
         renderJiraConnection();
       }
-      if (attachmentData.ok) data.attachmentCount = attachmentData.attachments?.length || bugAttachments.length;
+      if (attachmentData.ok) {
+        data.attachmentCount = attachmentData.attachments?.length || bugAttachments.length;
+        data.embeddedCount = attachmentData.embeddedCount || 0;
+        if (Array.isArray(attachmentData.warnings)) data.warnings = [...(data.warnings || []), ...attachmentData.warnings];
+      }
       else data.warnings = [...(data.warnings || []), attachmentData.message || "附件上傳失敗"];
     }
     renderJiraResult(data);
@@ -737,27 +755,34 @@ byId("bugSite").addEventListener("change", () => refreshBugUrls());
 byId("bugAgentUrl").addEventListener("change", () => { byId("bugMemberUrl").value = deriveMemberUrl(byId("bugAgentUrl").value); });
 byId("bugAssignee").addEventListener("change", updateBugMeta);
 byId("bugParent").addEventListener("input", updateBugMeta);
-byId("bugScreenshotDrop").addEventListener("click", () => byId("bugScreenshotInput").click());
-byId("bugScreenshotDrop").addEventListener("keydown", (event) => {
-  if (event.key === "Enter" || event.key === " ") {
+function bindScreenshotDrop(section, dropId, inputId) {
+  const drop = byId(dropId);
+  const input = byId(inputId);
+  drop.addEventListener("click", () => input.click());
+  drop.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      input.click();
+    }
+  });
+  input.addEventListener("change", (event) => {
+    addBugAttachments(event.target.files, section);
+    event.target.value = "";
+  });
+  drop.addEventListener("dragover", (event) => {
     event.preventDefault();
-    byId("bugScreenshotInput").click();
-  }
-});
-byId("bugScreenshotInput").addEventListener("change", (event) => {
-  addBugAttachments(event.target.files);
-  event.target.value = "";
-});
-byId("bugScreenshotDrop").addEventListener("dragover", (event) => {
-  event.preventDefault();
-  byId("bugScreenshotDrop").classList.add("dragging");
-});
-byId("bugScreenshotDrop").addEventListener("dragleave", () => byId("bugScreenshotDrop").classList.remove("dragging"));
-byId("bugScreenshotDrop").addEventListener("drop", (event) => {
-  event.preventDefault();
-  byId("bugScreenshotDrop").classList.remove("dragging");
-  addBugAttachments(event.dataTransfer?.files);
-});
+    drop.classList.add("dragging");
+  });
+  drop.addEventListener("dragleave", () => drop.classList.remove("dragging"));
+  drop.addEventListener("drop", (event) => {
+    event.preventDefault();
+    drop.classList.remove("dragging");
+    addBugAttachments(event.dataTransfer?.files, section);
+  });
+}
+
+bindScreenshotDrop("actual", "bugActualScreenshotDrop", "bugActualScreenshotInput");
+bindScreenshotDrop("expected", "bugExpectedScreenshotDrop", "bugExpectedScreenshotInput");
 document.addEventListener("paste", (event) => {
   if (!byId("view-bug").classList.contains("active")) return;
   const files = Array.from(event.clipboardData?.items || [])
@@ -765,8 +790,18 @@ document.addEventListener("paste", (event) => {
     .map((item) => item.getAsFile())
     .filter(Boolean);
   if (!files.length) return;
+  const target = event.target instanceof Element ? event.target : document.activeElement;
+  const section = target?.id === "bugExpected" || target?.closest?.('[data-screenshot-section="expected"]')
+    ? "expected"
+    : target?.id === "bugActual" || target?.closest?.('[data-screenshot-section="actual"]')
+      ? "actual"
+      : "";
+  if (!section) {
+    showToast("請先點選實際結果或預期結果，再貼上圖片");
+    return;
+  }
   event.preventDefault();
-  addBugAttachments(files);
+  addBugAttachments(files, section);
 });
 byId("jiraConnect").addEventListener("click", connectJira);
 byId("jiraDisconnect").addEventListener("click", disconnectJira);

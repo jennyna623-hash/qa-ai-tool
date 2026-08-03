@@ -117,17 +117,28 @@
               <label class="field full"><span>問題描述</span><textarea id="bugProblem" rows="3" placeholder="簡述發生的問題"></textarea></label>
               <label class="field full"><span>操作步驟</span><textarea id="bugSteps" rows="4" placeholder="1. 進入頁面&#10;2. 執行操作&#10;3. 觀察結果"></textarea></label>
               <label class="field full"><span>實際結果</span><textarea id="bugActual" rows="3"></textarea></label>
-              <label class="field full"><span>預期結果</span><textarea id="bugExpected" rows="3"></textarea></label>
               <div class="field full">
-                <span>截圖附件</span>
-                <div class="screenshot-drop" id="bugScreenshotDrop" tabindex="0" role="button" aria-describedby="bugScreenshotHelp">
-                  <input id="bugScreenshotInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+                <span>實際結果截圖</span>
+                <div class="screenshot-drop" id="bugActualScreenshotDrop" data-screenshot-section="actual" tabindex="0" role="button" aria-describedby="bugActualScreenshotHelp">
+                  <input id="bugActualScreenshotInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
                   <span class="screenshot-drop-icon" aria-hidden="true">＋</span>
                   <strong>Ctrl+V 直接貼上截圖</strong>
                   <span>也可以點擊選擇，或將圖片拖曳到這裡</span>
                 </div>
-                <small id="bugScreenshotHelp">支援 PNG、JPG、WEBP、GIF；最多 5 張，每張不超過 5MB。建立 Jira 後會自動上傳附件。</small>
-                <div class="screenshot-list" id="bugScreenshotList" aria-live="polite"></div>
+                <small id="bugActualScreenshotHelp">先點選實際結果欄位再貼圖；最多 5 張，每張不超過 5MB。</small>
+                <div class="screenshot-list" id="bugActualScreenshotList" aria-live="polite"></div>
+              </div>
+              <label class="field full"><span>預期結果</span><textarea id="bugExpected" rows="3"></textarea></label>
+              <div class="field full">
+                <span>預期結果截圖</span>
+                <div class="screenshot-drop" id="bugExpectedScreenshotDrop" data-screenshot-section="expected" tabindex="0" role="button" aria-describedby="bugExpectedScreenshotHelp">
+                  <input id="bugExpectedScreenshotInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+                  <span class="screenshot-drop-icon" aria-hidden="true">＋</span>
+                  <strong>Ctrl+V 直接貼上截圖</strong>
+                  <span>也可以點擊選擇，或將圖片拖曳到這裡</span>
+                </div>
+                <small id="bugExpectedScreenshotHelp">先點選預期結果欄位再貼圖；最多 5 張，每張不超過 5MB。建單後會顯示於對應內容並保留 Jira 附件。</small>
+                <div class="screenshot-list" id="bugExpectedScreenshotList" aria-live="polite"></div>
               </div>
             </div>
 

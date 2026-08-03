@@ -283,6 +283,52 @@ export function plainTextToAdf(value) {
   };
 }
 
+function headingText(node) {
+  if (node?.type !== "heading" || !Array.isArray(node.content)) return "";
+  return node.content.map((item) => item?.text || "").join("").trim();
+}
+
+function externalImageNode(image) {
+  return {
+    type: "mediaSingle",
+    attrs: { layout: "center", width: 80 },
+    content: [{
+      type: "media",
+      attrs: {
+        type: "external",
+        url: image.url,
+        alt: image.filename || "結果截圖"
+      }
+    }]
+  };
+}
+
+export function plainTextToAdfWithImages(value, imagesBySection = {}) {
+  const document = plainTextToAdf(value);
+  const sectionImages = new Map([
+    ["實際結果", Array.isArray(imagesBySection.actual) ? imagesBySection.actual : []],
+    ["預期結果", Array.isArray(imagesBySection.expected) ? imagesBySection.expected : []]
+  ]);
+  const content = [];
+  let activeSection = "";
+
+  const appendActiveImages = () => {
+    const images = sectionImages.get(activeSection) || [];
+    images.forEach((image) => content.push(externalImageNode(image)));
+  };
+
+  document.content.forEach((node) => {
+    const nextHeading = headingText(node);
+    if (nextHeading) {
+      appendActiveImages();
+      activeSection = nextHeading;
+    }
+    content.push(node);
+  });
+  appendActiveImages();
+  return { ...document, content };
+}
+
 export function redirectToApp(request, result, message = "") {
   const url = new URL("/", request.url);
   url.searchParams.set("jira", result);

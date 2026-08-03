@@ -7,11 +7,13 @@ import {
   noStoreHeaders,
   oauthConfigError,
   oauthConfigured,
+  plainTextToAdfWithImages,
   projectKey,
   validateSameOrigin
 } from "../../_lib/jira.js";
 
-const MAX_FILES = 5;
+const MAX_FILES_PER_SECTION = 5;
+const MAX_FILES = MAX_FILES_PER_SECTION * 2;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
@@ -50,9 +52,23 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, message: `只能上傳到 ${project} 專案的 Jira 單` }, 400, headers);
     }
 
-    const files = form.getAll("file").filter(isFile);
+    const description = String(form.get("description") || "").trim().slice(0, 60000);
+    const actualFiles = form.getAll("actualFile").filter(isFile);
+    const expectedFiles = form.getAll("expectedFile").filter(isFile);
+    const legacyFiles = form.getAll("file").filter(isFile);
+    const categorizedFiles = legacyFiles.length
+      ? legacyFiles.map((file) => ({ file, section: "actual" }))
+      : [
+          ...actualFiles.map((file) => ({ file, section: "actual" })),
+          ...expectedFiles.map((file) => ({ file, section: "expected" }))
+        ];
+    const files = categorizedFiles.map((item) => item.file);
     if (!files.length) return json({ ok: false, message: "請至少加入一張截圖" }, 400, headers);
     if (files.length > MAX_FILES) return json({ ok: false, message: `最多只能上傳 ${MAX_FILES} 張截圖` }, 400, headers);
+    if (actualFiles.length > MAX_FILES_PER_SECTION || expectedFiles.length > MAX_FILES_PER_SECTION) {
+      return json({ ok: false, message: `實際結果與預期結果各最多 ${MAX_FILES_PER_SECTION} 張截圖` }, 400, headers);
+    }
+    if (!description) return json({ ok: false, message: "Jira 描述不可為空" }, 400, headers);
 
     const jiraForm = new FormData();
     files.forEach((file, index) => {
@@ -69,13 +85,39 @@ export async function onRequestPost({ request, env }) {
     });
     if (!response.ok) throw new Error(await jiraError(response, "Jira 附件上傳失敗"));
     const uploaded = await response.json();
-    const attachments = (Array.isArray(uploaded) ? uploaded : []).map((attachment) => ({
+    const attachments = (Array.isArray(uploaded) ? uploaded : []).map((attachment, index) => ({
       id: attachment.id,
       filename: attachment.filename,
       mimeType: attachment.mimeType,
-      size: attachment.size
+      size: attachment.size,
+      section: categorizedFiles[index]?.section || "actual",
+      contentUrl: `${fresh.session.siteUrl}/rest/api/3/attachment/content/${encodeURIComponent(attachment.id)}`
     }));
-    return json({ ok: true, connected: true, issueKey, attachments }, 201, headers);
+
+    const imagesBySection = {
+      actual: attachments.filter((attachment) => attachment.section === "actual").map((attachment) => ({
+        url: attachment.contentUrl,
+        filename: attachment.filename
+      })),
+      expected: attachments.filter((attachment) => attachment.section === "expected").map((attachment) => ({
+        url: attachment.contentUrl,
+        filename: attachment.filename
+      }))
+    };
+    const warnings = [];
+    let embeddedCount = 0;
+    const updateResponse = await jiraFetch(fresh.session, `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { description: plainTextToAdfWithImages(description, imagesBySection) } })
+    });
+    if (updateResponse.ok) {
+      embeddedCount = attachments.length;
+    } else {
+      warnings.push(await jiraError(updateResponse, "附件已上傳，但圖片嵌入描述失敗"));
+    }
+
+    return json({ ok: true, connected: true, issueKey, attachments, embeddedCount, warnings }, 201, headers);
   } catch (error) {
     return json({
       ok: false,

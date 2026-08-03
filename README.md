@@ -13,7 +13,7 @@
 - Cloudflare Pages Function 健康檢查
 - Atlassian OAuth 2.0 安全連接
 - Jira GSI BUG 自動建立、受託人指派及主單關聯
-- BUG 截圖可直接貼上、拖曳或選檔，建單後自動上傳至 Jira 附件
+- 實際結果與預期結果各自支援貼圖、拖曳或選檔；建單後圖片顯示於對應描述區塊，並保留 Jira 附件
 
 ## 尚待串接
 
