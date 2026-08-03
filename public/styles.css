@@ -211,6 +211,8 @@ input[readonly], textarea[readonly] { background: #f8fafc; }
 .report-preview-line + .report-preview-line { margin-top: 7px; }
 .report-editor { width: 100%; min-height: 250px; border: 0; border-radius: 0; box-shadow: none; resize: vertical; }
 .report-editor:focus { border: 0; box-shadow: inset 0 0 0 2px #84adff; }
+.bug-telegram-card { margin-top: 18px; }
+.bug-telegram-preview, .bug-telegram-card .report-editor { min-height: 180px; }
 .weekly-top-grid { grid-template-columns: 240px 1fr; }
 .weekly-manual-heading { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); }
 .weekly-manual-grid { grid-template-columns: minmax(0, 1fr) minmax(220px, .65fr); }

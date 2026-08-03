@@ -2,6 +2,16 @@ const STORAGE_KEY = "gsi-ai-tools-cloud-v1";
 const WEEKLY_GROUPS = ["DEV 測試中", "STG 測試中", "待修正", "待進版 PROD", "已完成", "其他／待處理"];
 const WEEKLY_REPORTERS = ["Jenny", "Ben", "Guan"];
 const ASSIGNEES = ["Edward", "corey", "JOSEPH", "偉恩", "Ken", "KevinKao", "Will Zhang", "Simon Wu", "Jason hu"];
+const ASSIGNEE_TELEGRAM = {
+  Edward: "@edward61211",
+  corey: "@corey810125",
+  JOSEPH: "@theodennnnn",
+  偉恩: "@wayne1106",
+  Ken: "@kenyu123",
+  KevinKao: "@shengxiang",
+  "Will Zhang": "@WillZhang0121",
+  "Simon Wu": "@shinjuwu"
+};
 const MAX_BUG_ATTACHMENTS_PER_SECTION = 5;
 const MAX_BUG_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const BUG_ATTACHMENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
@@ -69,6 +79,7 @@ const state = loadState();
 let toastTimer;
 let jiraConnection = { configured: false, connected: false };
 let bugAttachments = [];
+let bugTelegramEditing = false;
 let requirementReportEditing = false;
 
 function loadState() {
@@ -502,6 +513,7 @@ function resetBug() {
   clearBugAttachments();
   updateBugMeta();
   byId("jiraCreateResult").classList.add("hidden");
+  clearBugTelegramReport();
 }
 
 function renderJiraConnection() {
@@ -606,6 +618,90 @@ function renderJiraResult(data) {
   }
 }
 
+function markdownLinkLabel(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/\]/g, "\\]");
+}
+
+function telegramMentionForAssignee(name) {
+  return ASSIGNEE_TELEGRAM[name] || `@${String(name || "處理人員").trim()}`;
+}
+
+function renderBugTelegramPreview() {
+  const raw = byId("bugTelegramOutput").value.trim();
+  const preview = byId("bugTelegramPreview");
+  preview.textContent = "";
+  if (!raw) {
+    const empty = document.createElement("p");
+    empty.className = "description-preview-empty";
+    empty.textContent = "Jira BUG 建立成功後會自動產生。";
+    preview.appendChild(empty);
+    return;
+  }
+  preview.appendChild(reportContentElement(raw));
+}
+
+function setBugTelegramEditing(editing) {
+  const output = byId("bugTelegramOutput");
+  bugTelegramEditing = Boolean(editing && output.value);
+  byId("bugTelegramPreview").classList.toggle("hidden", bugTelegramEditing);
+  output.classList.toggle("hidden", !bugTelegramEditing);
+  byId("bugTelegramEdit").textContent = bugTelegramEditing ? "完成" : "編輯";
+  if (bugTelegramEditing) {
+    output.focus();
+    output.setSelectionRange(output.value.length, output.value.length);
+  } else {
+    renderBugTelegramPreview();
+  }
+}
+
+function clearBugTelegramReport() {
+  byId("bugTelegramOutput").value = "";
+  byId("bugTelegramCard").classList.add("hidden");
+  byId("bugTelegramState").textContent = "尚未建立";
+  byId("bugTelegramState").classList.remove("ready");
+  byId("bugTelegramMeta").textContent = "尚未建立 Jira BUG。";
+  setBugTelegramEditing(false);
+}
+
+function buildBugTelegramReport(data) {
+  const title = byId("bugOutputTitle").value.trim() || data.issueKey;
+  const mention = telegramMentionForAssignee(byId("bugAssignee").value);
+  byId("bugTelegramOutput").value = [
+    `[${markdownLinkLabel(title)}](${data.issueUrl})`,
+    mention,
+    "",
+    "測試發現此問題，請協助排查確認"
+  ].join("\n");
+  byId("bugTelegramCard").classList.remove("hidden");
+  byId("bugTelegramState").textContent = "已產生";
+  byId("bugTelegramState").classList.add("ready");
+  byId("bugTelegramMeta").textContent = `${data.issueKey}｜處理人員：${mention}｜內容可編輯，尚未發送`;
+  setBugTelegramEditing(false);
+}
+
+async function copyBugTelegramReport() {
+  const raw = byId("bugTelegramOutput").value.trim();
+  if (!raw) {
+    showToast("目前沒有可複製的 TG 回報內容");
+    return;
+  }
+  let richCopy = false;
+  if (navigator.clipboard.write && window.ClipboardItem) {
+    try {
+      const html = reportContentElement(raw).innerHTML;
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([raw], { type: "text/plain" })
+      })]);
+      richCopy = true;
+    } catch {
+      richCopy = false;
+    }
+  }
+  if (!richCopy) await navigator.clipboard.writeText(raw);
+  showToast(richCopy ? "已複製 TG 超連結回報" : "已複製 TG 文字回報");
+}
+
 async function createJiraIssue() {
   if (!byId("bugMemberPassword").value.trim()) {
     byId("bugMemberPassword").focus();
@@ -618,6 +714,7 @@ async function createJiraIssue() {
     return;
   }
   if (!buildBugOutput({ silent: true })) return;
+  clearBugTelegramReport();
 
   const button = byId("jiraCreateIssue");
   const originalText = button.textContent;
@@ -668,6 +765,7 @@ async function createJiraIssue() {
       else data.warnings = [...(data.warnings || []), attachmentData.message || "附件上傳失敗"];
     }
     renderJiraResult(data);
+    if (data.ok) buildBugTelegramReport(data);
     showToast(data.ok ? `${data.issueKey} 建立成功` : (data.message || "Jira 建單失敗"));
   } catch {
     renderJiraResult({ ok: false, message: "無法連線到 Jira 後端，請稍後重試" });
@@ -1324,6 +1422,8 @@ byId("jiraConnect").addEventListener("click", connectJira);
 byId("jiraDisconnect").addEventListener("click", disconnectJira);
 byId("jiraCreateIssue").addEventListener("click", createJiraIssue);
 byId("openJiraCreate").addEventListener("click", () => window.open(`${state.jiraBaseUrl.replace(/\/$/, "")}/secure/CreateIssue.jspa`, "_blank", "noopener"));
+byId("bugTelegramEdit").addEventListener("click", () => setBugTelegramEditing(!bugTelegramEditing));
+byId("bugTelegramCopy").addEventListener("click", copyBugTelegramReport);
 byId("requirementReportForm").addEventListener("submit", (event) => { event.preventDefault(); generateRequirementReport(); });
 byId("requirementReportIssue").addEventListener("input", (event) => {
   const value = normalizeIssueNumber(event.target.value);
