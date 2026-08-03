@@ -475,12 +475,6 @@ function buildBugDescription(useImageMarkers = false) {
 }
 
 function buildBugOutput({ silent = false } = {}) {
-  const password = byId("bugMemberPassword").value.trim();
-  if (!password) {
-    byId("bugMemberPassword").focus();
-    showToast("請先填寫會員密碼");
-    return false;
-  }
   const env = byId("bugEnv").value;
   const site = byId("bugSite").value;
   const memberUrl = byId("bugMemberUrl").value;
@@ -703,11 +697,6 @@ async function copyBugTelegramReport() {
 }
 
 async function createJiraIssue() {
-  if (!byId("bugMemberPassword").value.trim()) {
-    byId("bugMemberPassword").focus();
-    showToast("請先填寫會員密碼");
-    return;
-  }
   if (!jiraConnection.connected) {
     if (jiraConnection.configured) connectJira();
     else showToast(jiraConnection.message || "請先完成 Jira OAuth 設定");
