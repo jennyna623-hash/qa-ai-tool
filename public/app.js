@@ -957,7 +957,7 @@ async function addWeeklySources() {
 
 function addWeeklyManualItem() {
   const title = byId("weeklyManualTitle").value.trim();
-  const status = byId("weeklyManualStatus").value.trim();
+  const link = byId("weeklyManualLink").value.trim();
   const group = WEEKLY_GROUPS.includes(byId("weeklyManualGroup").value)
     ? byId("weeklyManualGroup").value
     : "其他／待處理";
@@ -967,19 +967,28 @@ function addWeeklyManualItem() {
     byId("weeklyManualTitle").focus();
     return;
   }
+  try {
+    const url = new URL(link);
+    if (!/^https?:$/.test(url.protocol)) throw new Error("invalid protocol");
+  } catch {
+    byId("weeklyManualMessage").textContent = "請填寫完整的 http:// 或 https:// 連結。";
+    byId("weeklyManualMessage").className = "report-status error";
+    byId("weeklyManualLink").focus();
+    return;
+  }
 
   const data = currentWeeklyData();
   data.items.push({
     id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
     type: "manual",
     key: "手動項目",
-    url: "",
+    url: link,
     summary: title,
-    status: status || "未填寫狀態",
+    status: "",
     group
   });
   byId("weeklyManualTitle").value = "";
-  byId("weeklyManualStatus").value = "";
+  byId("weeklyManualLink").value = "";
   saveWeeklyForm();
   renderWeeklyBoard();
   generateWeeklyOutput();
@@ -1032,7 +1041,7 @@ function createWeeklyItem(item) {
     source.target = "_blank";
     source.rel = "noopener noreferrer";
   }
-  source.textContent = item.type === "manual" ? "手動項目" : item.key;
+  source.textContent = item.type === "manual" ? "手動連結" : item.key;
   const remove = document.createElement("button");
   remove.className = "remove-item";
   remove.type = "button";
@@ -1056,14 +1065,25 @@ function createWeeklyItem(item) {
   const summary = document.createElement("input");
   summary.value = item.summary;
   summary.addEventListener("input", () => { item.summary = summary.value; saveWeeklyForm(); });
+  summary.addEventListener("change", generateWeeklyOutput);
   summaryLabel.appendChild(summary);
 
-  const statusLabel = document.createElement("label");
-  statusLabel.textContent = "狀態";
-  const status = document.createElement("input");
-  status.value = item.status;
-  status.addEventListener("input", () => { item.status = status.value; saveWeeklyForm(); });
-  statusLabel.appendChild(status);
+  const detailLabel = document.createElement("label");
+  detailLabel.textContent = item.type === "manual" ? "連結" : "狀態";
+  const detail = document.createElement("input");
+  detail.type = item.type === "manual" ? "url" : "text";
+  detail.value = item.type === "manual" ? (item.url || "") : (item.status || "");
+  detail.addEventListener("input", () => {
+    if (item.type === "manual") {
+      item.url = detail.value.trim();
+      source.href = item.url;
+    } else {
+      item.status = detail.value;
+    }
+    saveWeeklyForm();
+  });
+  detail.addEventListener("change", generateWeeklyOutput);
+  detailLabel.appendChild(detail);
 
   const groupLabel = document.createElement("label");
   groupLabel.textContent = "分類";
@@ -1076,7 +1096,7 @@ function createWeeklyItem(item) {
     generateWeeklyOutput();
   });
   groupLabel.appendChild(groupSelect);
-  wrap.append(summaryLabel, statusLabel, groupLabel);
+  wrap.append(summaryLabel, detailLabel, groupLabel);
   return wrap;
 }
 
@@ -1106,10 +1126,42 @@ function generateWeeklyOutput() {
     const items = data.items.filter((item) => item.group === group);
     if (!items.length) return;
     lines.push("", `${group}（${items.length}）`);
-    items.forEach((item, index) => lines.push(`${index + 1}. ${item.summary || item.key}｜${item.status || "狀態未填"}`));
+    items.forEach((item, index) => {
+      const title = String(item.summary || item.key || "未命名項目").replace(/\\/g, "\\\\").replace(/\]/g, "\\]");
+      const linkedTitle = /^https?:\/\//i.test(item.url || "") ? `[${title}](${item.url})` : title;
+      const status = item.type === "manual" ? "" : `｜${item.status || "狀態未填"}`;
+      lines.push(`${index + 1}. ${linkedTitle}${status}`);
+    });
   });
   byId("weeklyOutput").value = lines.join("\n");
   saveWeeklyForm();
+}
+
+async function copyWeeklyOutput() {
+  const raw = byId("weeklyOutput").value.trim();
+  if (!raw) {
+    showToast("目前沒有可複製的周進度內容");
+    return;
+  }
+  const rich = document.createElement("div");
+  raw.split("\n").forEach((line, index, lines) => {
+    appendMarkdownLine(rich, line);
+    if (index < lines.length - 1) rich.appendChild(document.createElement("br"));
+  });
+  let richCopy = false;
+  if (navigator.clipboard.write && window.ClipboardItem) {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/plain": new Blob([raw], { type: "text/plain" }),
+        "text/html": new Blob([rich.innerHTML], { type: "text/html" })
+      })]);
+      richCopy = true;
+    } catch {
+      richCopy = false;
+    }
+  }
+  if (!richCopy) await navigator.clipboard.writeText(raw);
+  showToast(richCopy ? "已複製 TG 超連結格式" : "已複製 Markdown 格式");
 }
 
 function clearWeekly() {
@@ -1236,6 +1288,7 @@ byId("weeklyAdd").addEventListener("click", addWeeklySources);
 byId("weeklyManualAdd").addEventListener("click", addWeeklyManualItem);
 byId("weeklyClear").addEventListener("click", clearWeekly);
 byId("weeklyGenerate").addEventListener("click", generateWeeklyOutput);
+byId("weeklyCopy").addEventListener("click", copyWeeklyOutput);
 byId("weeklyDate").addEventListener("change", loadWeekly);
 byId("weeklyReporter").addEventListener("change", saveWeeklyForm);
 byId("weeklyOutput").addEventListener("input", saveWeeklyForm);

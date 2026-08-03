@@ -257,7 +257,7 @@
           </div>
           <div class="form-grid weekly-manual-grid">
             <label class="field full"><span>工作標題</span><input id="weeklyManualTitle" type="text" placeholder="例如：整理測試案例與驗收結果"></label>
-            <label class="field"><span>目前狀態／備註</span><input id="weeklyManualStatus" type="text" placeholder="例如：進行中"></label>
+            <label class="field"><span>連結</span><input id="weeklyManualLink" type="url" placeholder="https://..."></label>
             <label class="field"><span>分類</span><select id="weeklyManualGroup"></select></label>
           </div>
           <div class="actions">
@@ -271,7 +271,7 @@
           <textarea id="weeklyOutput" rows="16" placeholder="加入 Jira 項目後產生彙整"></textarea>
           <div class="inline-actions">
             <button class="button primary" type="button" id="weeklyGenerate">重新整理彙整</button>
-            <button class="button soft" type="button" data-copy="weeklyOutput">複製結果</button>
+            <button class="button soft" type="button" id="weeklyCopy">複製 TG 格式</button>
           </div>
         </article>
 
