@@ -955,6 +955,39 @@ async function addWeeklySources() {
   }
 }
 
+function addWeeklyManualItem() {
+  const title = byId("weeklyManualTitle").value.trim();
+  const status = byId("weeklyManualStatus").value.trim();
+  const group = WEEKLY_GROUPS.includes(byId("weeklyManualGroup").value)
+    ? byId("weeklyManualGroup").value
+    : "其他／待處理";
+  if (!title) {
+    byId("weeklyManualMessage").textContent = "請先填寫工作標題。";
+    byId("weeklyManualMessage").className = "report-status error";
+    byId("weeklyManualTitle").focus();
+    return;
+  }
+
+  const data = currentWeeklyData();
+  data.items.push({
+    id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+    type: "manual",
+    key: "手動項目",
+    url: "",
+    summary: title,
+    status: status || "未填寫狀態",
+    group
+  });
+  byId("weeklyManualTitle").value = "";
+  byId("weeklyManualStatus").value = "";
+  saveWeeklyForm();
+  renderWeeklyBoard();
+  generateWeeklyOutput();
+  byId("weeklyManualMessage").textContent = `已加入「${title}」。`;
+  byId("weeklyManualMessage").className = "report-status ok";
+  showToast("已加入手動項目");
+}
+
 function renderWeeklyBoard() {
   const board = byId("weeklyBoard");
   const data = currentWeeklyData();
@@ -992,12 +1025,14 @@ function createWeeklyItem(item) {
   wrap.className = "weekly-item";
   const top = document.createElement("div");
   top.className = "weekly-item-top";
-  const source = document.createElement("a");
+  const source = document.createElement(item.url ? "a" : "span");
   source.className = "weekly-source";
-  source.href = item.url;
-  source.target = "_blank";
-  source.rel = "noopener noreferrer";
-  source.textContent = item.key;
+  if (item.url) {
+    source.href = item.url;
+    source.target = "_blank";
+    source.rel = "noopener noreferrer";
+  }
+  source.textContent = item.type === "manual" ? "手動項目" : item.key;
   const remove = document.createElement("button");
   remove.className = "remove-item";
   remove.type = "button";
@@ -1194,6 +1229,7 @@ byId("requirementReportEdit").addEventListener("click", () => setRequirementRepo
 byId("requirementReportCopy").addEventListener("click", copyRequirementReport);
 byId("weeklyConnectJira").addEventListener("click", connectJira);
 byId("weeklyAdd").addEventListener("click", addWeeklySources);
+byId("weeklyManualAdd").addEventListener("click", addWeeklyManualItem);
 byId("weeklyClear").addEventListener("click", clearWeekly);
 byId("weeklyGenerate").addEventListener("click", generateWeeklyOutput);
 byId("weeklyDate").addEventListener("change", loadWeekly);
@@ -1210,6 +1246,7 @@ byId("requirementReportIssue").value = state.requirementIssue;
 byId("requirementReportStage").value = state.requirementStage;
 refreshBugSites("set_r017｜R017");
 refreshBugUrls("https://agent-gsi2.gsiwl.com");
+fillSelect(byId("weeklyManualGroup"), WEEKLY_GROUPS, "其他／待處理");
 byId("weeklyDate").value = dateKey(new Date());
 loadWeekly();
 checkJiraConnection();

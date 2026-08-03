@@ -200,6 +200,8 @@ input[readonly], textarea[readonly] { background: #f8fafc; }
 .report-editor { width: 100%; min-height: 250px; border: 0; border-radius: 0; box-shadow: none; resize: vertical; }
 .report-editor:focus { border: 0; box-shadow: inset 0 0 0 2px #84adff; }
 .weekly-top-grid { grid-template-columns: 240px 1fr; }
+.weekly-manual-heading { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); }
+.weekly-manual-grid { grid-template-columns: minmax(0, 1fr) minmax(220px, .65fr); }
 .weekly-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
 .weekly-group { min-height: 170px; padding: 17px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.92); }
 .weekly-group-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 13px; }

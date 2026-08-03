@@ -250,6 +250,20 @@
           </div>
           <div class="report-status" id="weeklySyncStatus" aria-live="polite">請輸入 Jira 單號；自動分類後仍可手動調整。</div>
           <div class="notice"><strong>自動分類：</strong>依 Jira 狀態分為 DEV 測試中、STG 測試中、待修正、待進版 PROD、已完成或其他／待處理。</div>
+
+          <div class="section-heading compact weekly-manual-heading">
+            <span>＋</span>
+            <div><h3>手動新增</h3><p>沒有 Jira 單號的工作也能加入周進度。</p></div>
+          </div>
+          <div class="form-grid weekly-manual-grid">
+            <label class="field full"><span>工作標題</span><input id="weeklyManualTitle" type="text" placeholder="例如：整理測試案例與驗收結果"></label>
+            <label class="field"><span>目前狀態／備註</span><input id="weeklyManualStatus" type="text" placeholder="例如：進行中"></label>
+            <label class="field"><span>分類</span><select id="weeklyManualGroup"></select></label>
+          </div>
+          <div class="actions">
+            <button class="button soft" type="button" id="weeklyManualAdd">加入手動項目</button>
+          </div>
+          <div class="report-status" id="weeklyManualMessage" aria-live="polite">手動項目只保存在目前瀏覽器。</div>
         </div>
 
         <div class="weekly-board" id="weeklyBoard"></div>
