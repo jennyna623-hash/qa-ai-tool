@@ -599,7 +599,12 @@ function renderJiraResult(data) {
   link.target = "_blank";
   link.rel = "noopener noreferrer";
   link.textContent = "開啟 Jira 單";
-  result.append(strong, link);
+  const telegramButton = document.createElement("button");
+  telegramButton.type = "button";
+  telegramButton.className = "jira-result-telegram";
+  telegramButton.textContent = "查看 TG 回報";
+  telegramButton.addEventListener("click", revealBugTelegramReport);
+  result.append(strong, link, telegramButton);
   if (data.attachmentCount) {
     const attachment = document.createElement("small");
     attachment.textContent = `已上傳 ${data.attachmentCount} 張附件；${data.embeddedCount || 0} 張已顯示於對應結果`;
@@ -610,6 +615,15 @@ function renderJiraResult(data) {
     warning.textContent = data.warnings.join("；");
     result.appendChild(warning);
   }
+}
+
+function revealBugTelegramReport() {
+  const card = byId("bugTelegramCard");
+  if (card.classList.contains("hidden")) return;
+  card.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "center"
+  });
 }
 
 function markdownLinkLabel(value) {
@@ -671,6 +685,7 @@ function buildBugTelegramReport(data) {
   byId("bugTelegramState").classList.add("ready");
   byId("bugTelegramMeta").textContent = `${data.issueKey}｜處理人員：${mention}｜內容可編輯，尚未發送`;
   setBugTelegramEditing(false);
+  requestAnimationFrame(() => requestAnimationFrame(revealBugTelegramReport));
 }
 
 async function copyBugTelegramReport() {
