@@ -11,12 +11,13 @@
 - 周進度項目、手動分類與彙整
 - 每位同事的瀏覽器個人設定
 - Cloudflare Pages Function 健康檢查
+- Atlassian OAuth 2.0 安全連接
+- Jira GSI BUG 自動建立、受託人指派及主單關聯
 
 ## 尚待串接
 
-- Atlassian OAuth 與 Jira REST API
 - Notion Integration／OAuth
-- Jira 自動建立、選擇受託人、關聯主單及圖片附件
+- Jira 圖片附件
 - Jira／Notion 周進度自動讀取與分類
 - 原本依賴本機 Chrome 的網站自動登入
 
@@ -30,6 +31,28 @@
 - Build output directory：`public`
 
 Cloudflare 會把專案根目錄的 `functions` 自動建立成 Pages Functions。
+
+## Jira OAuth 設定
+
+在 Atlassian Developer Console 建立 OAuth 2.0 (3LO) integration：
+
+- Callback URL：`https://qa-ai-tool.pages.dev/api/jira/oauth/callback`
+- Jira platform API scopes：`read:jira-user`、`read:jira-work`、`write:jira-work`
+- 工具授權網址還會要求 `offline_access`，讓 Jira 登入可安全續期
+
+接著在 Cloudflare Pages 專案加入加密 Secrets：
+
+- `ATLASSIAN_CLIENT_ID`
+- `ATLASSIAN_CLIENT_SECRET`
+- `JIRA_SESSION_SECRET`（至少 32 個隨機字元）
+
+選用變數：
+
+- `ATLASSIAN_CALLBACK_URL`：預設依目前網站產生
+- `JIRA_SITE_URL`：預設 `https://gamingsoft.atlassian.net`
+- `JIRA_PROJECT_KEY`：預設 `GSI`
+- `JIRA_ISSUE_TYPE_ID`：未設定時自動尋找「漏洞／Bug」類型
+- `JIRA_LINK_TYPE_NAME`：預設 `Blocks`，對應既有「is blocked by」主單關聯
 
 ## 本機預覽
 

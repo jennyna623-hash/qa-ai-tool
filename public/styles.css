@@ -33,6 +33,8 @@ body {
 
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
+button:disabled { cursor: wait; opacity: .62; }
+.hidden { display: none !important; }
 
 .app-shell { width: 100%; min-width: 0; min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
 
@@ -130,6 +132,26 @@ input[readonly], textarea[readonly] { background: #f8fafc; }
 .mini-state.ready { color: var(--success); background: var(--success-soft); }
 .field-note { margin-top: 16px; padding: 11px 12px; border-radius: 10px; color: var(--muted); background: #f8fafc; font-size: 12px; line-height: 1.5; }
 
+.jira-connection {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 13px;
+  border: 1px solid #fedf89; border-radius: 12px; background: #fffaeb;
+}
+.jira-connection.connected { border-color: #abefc6; background: var(--success-soft); }
+.jira-connection.not-configured { border-color: #fecdca; background: var(--danger-soft); }
+.jira-connection-copy { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.jira-connection-copy strong, .jira-connection-copy small { display: block; }
+.jira-connection-copy strong { color: #344054; font-size: 13px; }
+.jira-connection-copy small { margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; }
+.connection-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: #f79009; box-shadow: 0 0 0 4px rgba(247,144,9,.12); }
+.connection-dot.connected { background: #12b76a; box-shadow: 0 0 0 4px rgba(18,183,106,.12); }
+.jira-connection-actions { flex: 0 0 auto; display: flex; gap: 7px; }
+.jira-connection-actions .button { min-height: 34px; padding: 0 11px; font-size: 12px; }
+.jira-result { display: grid; gap: 5px; margin-top: 12px; padding: 12px; border: 1px solid #abefc6; border-radius: 10px; background: var(--success-soft); font-size: 13px; }
+.jira-result strong { color: var(--success); }
+.jira-result a { width: fit-content; color: var(--primary); font-weight: 750; }
+.jira-result small { color: var(--warning); line-height: 1.5; }
+.jira-result.error { border-color: #fecdca; color: var(--danger); background: var(--danger-soft); }
+
 .notice { margin-top: 18px; padding: 12px 14px; border: 1px solid #fedf89; border-radius: 11px; color: #7a2e0e; background: var(--warning-soft); font-size: 13px; line-height: 1.6; }
 .weekly-top-grid { grid-template-columns: 240px 1fr; }
 .weekly-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
@@ -193,6 +215,7 @@ input[readonly], textarea[readonly] { background: #f8fafc; }
   .field.full, .settings-grid .warning-card { grid-column: auto; }
   .weekly-board, .status-grid { grid-template-columns: 1fr; }
   .card { padding: 18px; border-radius: 14px; }
+  .jira-connection { align-items: flex-start; flex-direction: column; }
   .health-card { grid-template-columns: 1fr; }
   .health-card pre { grid-column: auto; }
 }

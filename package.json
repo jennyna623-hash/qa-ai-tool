@@ -1,6 +1,7 @@
 {
   "name": "gsi-ai-tools-cloud",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "type": "module",
   "private": true,
   "description": "GSI QA AI 工具 Cloudflare Pages 雲端版",
   "scripts": {

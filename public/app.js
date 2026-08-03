@@ -62,6 +62,7 @@ const SITES = [
 const byId = (id) => document.getElementById(id);
 const state = loadState();
 let toastTimer;
+let jiraConnection = { configured: false, connected: false };
 
 function loadState() {
   try {
@@ -155,6 +156,11 @@ function normalizeIssueNumber(value) {
   return match ? match[1] : "";
 }
 
+function updateBugMeta() {
+  const parent = normalizeIssueNumber(byId("bugParent").value);
+  byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：${parent ? `GSI-${parent}` : "未設定"}`;
+}
+
 function buildBugOutput() {
   const env = byId("bugEnv").value;
   const site = byId("bugSite").value;
@@ -194,7 +200,9 @@ function buildBugOutput() {
   byId("bugOutputContent").value = content;
   byId("bugOutputState").textContent = "已產生";
   byId("bugOutputState").classList.add("ready");
-  byId("bugMeta").textContent = `受託人：${assignee}｜主單：${parent ? `GSI-${parent}` : "未設定"}`;
+  updateBugMeta();
+  byId("jiraCreateResult").classList.add("hidden");
+  byId("jiraCreateResult").textContent = "";
   showToast("Jira 草稿已產生");
 }
 
@@ -204,7 +212,150 @@ function resetBug() {
   byId("bugOutputContent").value = "";
   byId("bugOutputState").textContent = "尚未產生";
   byId("bugOutputState").classList.remove("ready");
-  byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：未設定`;
+  updateBugMeta();
+  byId("jiraCreateResult").classList.add("hidden");
+}
+
+function renderJiraConnection() {
+  const card = byId("jiraConnectionCard");
+  const dot = byId("jiraConnectionDot");
+  const title = byId("jiraConnectionTitle");
+  const text = byId("jiraConnectionText");
+  const connect = byId("jiraConnect");
+  const disconnect = byId("jiraDisconnect");
+  card.classList.toggle("connected", jiraConnection.connected);
+  card.classList.toggle("not-configured", !jiraConnection.configured);
+  dot.classList.toggle("connected", jiraConnection.connected);
+  connect.classList.toggle("hidden", jiraConnection.connected);
+  disconnect.classList.toggle("hidden", !jiraConnection.connected);
+
+  if (jiraConnection.connected) {
+    title.textContent = "Jira 已連接";
+    text.textContent = `${jiraConnection.displayName || "目前帳號"}｜${jiraConnection.projectKey || "GSI"}`;
+    connect.disabled = false;
+    return;
+  }
+  if (!jiraConnection.configured) {
+    title.textContent = "Jira 尚未完成設定";
+    text.textContent = jiraConnection.message || "需要先設定 Atlassian OAuth";
+    connect.disabled = false;
+    return;
+  }
+  title.textContent = "Jira 尚未連接";
+  text.textContent = `連接 ${jiraConnection.siteUrl || "gamingsoft.atlassian.net"} 後可直接建單`;
+  connect.disabled = false;
+}
+
+async function checkJiraConnection() {
+  try {
+    const response = await fetch("/api/jira/status", { headers: { Accept: "application/json" }, cache: "no-store" });
+    const data = await response.json();
+    jiraConnection = { ...data, configured: Boolean(data.configured), connected: Boolean(data.connected) };
+  } catch {
+    jiraConnection = {
+      configured: false,
+      connected: false,
+      message: "本機靜態預覽不含 Jira 後端；請使用 Cloudflare 線上版"
+    };
+  }
+  renderJiraConnection();
+}
+
+function connectJira() {
+  if (!jiraConnection.configured) {
+    showToast(jiraConnection.message || "Cloudflare 尚未設定 Atlassian OAuth");
+    return;
+  }
+  window.location.href = "/api/jira/oauth/start";
+}
+
+async function disconnectJira() {
+  const response = await fetch("/api/jira/disconnect", {
+    method: "POST",
+    headers: { Accept: "application/json" }
+  }).catch(() => null);
+  if (!response?.ok) {
+    showToast("無法中斷 Jira，請稍後重試");
+    return;
+  }
+  jiraConnection.connected = false;
+  renderJiraConnection();
+  showToast("已中斷 Jira");
+}
+
+function renderJiraResult(data) {
+  const result = byId("jiraCreateResult");
+  result.textContent = "";
+  result.classList.remove("hidden", "error");
+  if (!data.ok) {
+    result.classList.add("error");
+    result.textContent = data.message || "Jira 建單失敗";
+    return;
+  }
+  const strong = document.createElement("strong");
+  strong.textContent = `${data.issueKey} 建立成功`;
+  const link = document.createElement("a");
+  link.href = data.issueUrl;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "開啟 Jira 單";
+  result.append(strong, link);
+  if (Array.isArray(data.warnings) && data.warnings.length) {
+    const warning = document.createElement("small");
+    warning.textContent = data.warnings.join("；");
+    result.appendChild(warning);
+  }
+}
+
+async function createJiraIssue() {
+  if (!jiraConnection.connected) {
+    if (jiraConnection.configured) connectJira();
+    else showToast(jiraConnection.message || "請先完成 Jira OAuth 設定");
+    return;
+  }
+  if (!byId("bugOutputTitle").value || !byId("bugOutputContent").value) buildBugOutput();
+
+  const button = byId("jiraCreateIssue");
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "建立中…";
+  byId("jiraCreateResult").classList.add("hidden");
+  try {
+    const parent = normalizeIssueNumber(byId("bugParent").value);
+    const response = await fetch("/api/jira/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        title: byId("bugOutputTitle").value,
+        description: byId("bugOutputContent").value,
+        assignee: byId("bugAssignee").value,
+        parentIssue: parent ? `GSI-${parent}` : ""
+      })
+    });
+    const data = await response.json().catch(() => ({ ok: false, message: `Jira 建單失敗（HTTP ${response.status}）` }));
+    if (response.status === 401) {
+      jiraConnection.connected = false;
+      renderJiraConnection();
+    }
+    renderJiraResult(data);
+    showToast(data.ok ? `${data.issueKey} 建立成功` : (data.message || "Jira 建單失敗"));
+  } catch {
+    renderJiraResult({ ok: false, message: "無法連線到 Jira 後端，請稍後重試" });
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+function consumeJiraRedirectResult() {
+  const url = new URL(window.location.href);
+  const result = url.searchParams.get("jira");
+  if (!result) return;
+  const message = url.searchParams.get("jira_message");
+  showToast(result === "connected" ? "Jira 已成功連接" : (message || "Jira 連接失敗"));
+  url.searchParams.delete("jira");
+  url.searchParams.delete("jira_message");
+  history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 async function copyValue(id) {
@@ -474,7 +625,11 @@ byId("bugReset").addEventListener("click", resetBug);
 byId("bugEnv").addEventListener("change", () => refreshBugSites());
 byId("bugSite").addEventListener("change", () => refreshBugUrls());
 byId("bugAgentUrl").addEventListener("change", () => { byId("bugMemberUrl").value = deriveMemberUrl(byId("bugAgentUrl").value); });
-byId("bugAssignee").addEventListener("change", () => { byId("bugMeta").textContent = `受託人：${byId("bugAssignee").value}｜主單：未設定`; });
+byId("bugAssignee").addEventListener("change", updateBugMeta);
+byId("bugParent").addEventListener("input", updateBugMeta);
+byId("jiraConnect").addEventListener("click", connectJira);
+byId("jiraDisconnect").addEventListener("click", disconnectJira);
+byId("jiraCreateIssue").addEventListener("click", createJiraIssue);
 byId("openJiraCreate").addEventListener("click", () => window.open(`${state.jiraBaseUrl.replace(/\/$/, "")}/secure/CreateIssue.jspa`, "_blank", "noopener"));
 byId("weeklyAdd").addEventListener("click", addWeeklySources);
 byId("weeklyClear").addEventListener("click", clearWeekly);
@@ -486,8 +641,10 @@ byId("settingsForm").addEventListener("submit", saveSettings);
 byId("healthCheck").addEventListener("click", checkHealth);
 
 initializeAssignees();
+consumeJiraRedirectResult();
 byId("jiraBaseUrl").value = state.jiraBaseUrl;
 refreshBugSites("set_r017｜R017");
 refreshBugUrls("https://agent-gsi2.gsiwl.com");
 byId("weeklyDate").value = dateKey(new Date());
 loadWeekly();
+checkJiraConnection();
