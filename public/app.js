@@ -309,7 +309,6 @@ function renderBugOutputPreview() {
     `會員帳號：${byId("bugMemberAccount").value.trim()}　　會員密碼：${byId("bugMemberPassword").value.trim()}`
   ].join("\n");
   appendPreviewSection(preview, "基本信息", basicInfo);
-  appendPreviewSection(preview, "問題描述", byId("bugProblem").value.trim());
   appendPreviewSection(preview, "操作步驟", byId("bugSteps").value.trim());
   appendPreviewSection(
     preview,
@@ -335,7 +334,6 @@ function buildBugOutput() {
   const assignee = byId("bugAssignee").value;
   const parent = normalizeIssueNumber(byId("bugParent").value);
   const seed = byId("bugTitleSeed").value.trim();
-  const problem = byId("bugProblem").value.trim();
   const steps = byId("bugSteps").value.trim();
   const actual = byId("bugActual").value.trim();
   const expected = byId("bugExpected").value.trim();
@@ -347,9 +345,6 @@ function buildBugOutput() {
     `代理端地址：${agentUrl}`,
     `會員端地址：${memberUrl}`,
     `會員帳號：${account}　　會員密碼：${password}`,
-    "",
-    "問題描述：",
-    problem,
     "",
     "操作步驟：",
     steps,
@@ -372,7 +367,7 @@ function buildBugOutput() {
 }
 
 function resetBug() {
-  ["bugTitleSeed", "bugProblem", "bugSteps", "bugActual", "bugExpected", "bugParent"].forEach((id) => { byId(id).value = ""; });
+  ["bugTitleSeed", "bugSteps", "bugActual", "bugExpected", "bugParent"].forEach((id) => { byId(id).value = ""; });
   byId("bugOutputTitle").value = "";
   byId("bugOutputContent").value = "";
   renderBugOutputPreview();
