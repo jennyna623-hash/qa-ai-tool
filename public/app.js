@@ -4,6 +4,7 @@ const ASSIGNEES = ["Edward", "corey", "JOSEPH", "偉恩", "Ken", "KevinKao", "Wi
 const MAX_BUG_ATTACHMENTS_PER_SECTION = 5;
 const MAX_BUG_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const BUG_ATTACHMENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const REQUIREMENT_REPORT_STAGES = new Set(["DEV", "STG", "DEV_REJECT", "STG_REJECT"]);
 
 const SITES = [
   { url: "https://agent-bmm1-dev.gsiwl.com", env: "DEV", code: "set_r021｜R021" },
@@ -67,6 +68,7 @@ const state = loadState();
 let toastTimer;
 let jiraConnection = { configured: false, connected: false };
 let bugAttachments = [];
+let requirementReportEditing = false;
 
 function loadState() {
   try {
@@ -74,10 +76,12 @@ function loadState() {
     return {
       defaultAssignee: saved.defaultAssignee || "Edward",
       jiraBaseUrl: saved.jiraBaseUrl || "https://gamingsoft.atlassian.net",
+      requirementIssue: normalizeIssueNumber(saved.requirementIssue || ""),
+      requirementStage: REQUIREMENT_REPORT_STAGES.has(saved.requirementStage) ? saved.requirementStage : "DEV",
       weekly: saved.weekly && typeof saved.weekly === "object" ? saved.weekly : {}
     };
   } catch {
-    return { defaultAssignee: "Edward", jiraBaseUrl: "https://gamingsoft.atlassian.net", weekly: {} };
+    return { defaultAssignee: "Edward", jiraBaseUrl: "https://gamingsoft.atlassian.net", requirementIssue: "", requirementStage: "DEV", weekly: {} };
   }
 }
 
@@ -680,6 +684,148 @@ async function copyValue(id) {
   showToast("已複製到剪貼簿");
 }
 
+function setRequirementReportStatus(message, type = "") {
+  const status = byId("requirementReportStatus");
+  status.textContent = message;
+  status.className = `report-status ${type}`.trim();
+}
+
+function appendMarkdownLine(target, line) {
+  const pattern = /\[((?:\\.|[^\]])*)\]\((https?:\/\/[^)]+)\)/g;
+  let cursor = 0;
+  let match;
+  while ((match = pattern.exec(line))) {
+    if (match.index > cursor) target.appendChild(document.createTextNode(line.slice(cursor, match.index)));
+    const link = document.createElement("a");
+    link.href = match[2];
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = match[1].replace(/\\\]/g, "]").replace(/\\\\/g, "\\");
+    target.appendChild(link);
+    cursor = pattern.lastIndex;
+  }
+  if (cursor < line.length) target.appendChild(document.createTextNode(line.slice(cursor)));
+}
+
+function reportContentElement(raw) {
+  const container = document.createElement("div");
+  raw.split(/\r?\n/).forEach((line, index) => {
+    if (index > 0) container.appendChild(document.createElement("br"));
+    if (line) appendMarkdownLine(container, line);
+  });
+  return container;
+}
+
+function renderRequirementReportPreview() {
+  const output = byId("requirementReportOutput").value.trim();
+  const preview = byId("requirementReportPreview");
+  preview.textContent = "";
+  if (!output) {
+    const empty = document.createElement("p");
+    empty.className = "description-preview-empty";
+    empty.textContent = "尚未產生。";
+    preview.appendChild(empty);
+    return;
+  }
+  preview.appendChild(reportContentElement(output));
+}
+
+function setRequirementReportEditing(editing) {
+  const output = byId("requirementReportOutput");
+  requirementReportEditing = Boolean(editing && output.value);
+  byId("requirementReportPreview").classList.toggle("hidden", requirementReportEditing);
+  output.classList.toggle("hidden", !requirementReportEditing);
+  byId("requirementReportEdit").textContent = requirementReportEditing ? "完成" : "編輯";
+  if (requirementReportEditing) {
+    output.focus();
+    output.setSelectionRange(output.value.length, output.value.length);
+  } else {
+    renderRequirementReportPreview();
+  }
+}
+
+async function generateRequirementReport() {
+  const issueNumber = normalizeIssueNumber(byId("requirementReportIssue").value);
+  if (!issueNumber) {
+    setRequirementReportStatus("請輸入正確的 Jira 單號。", "error");
+    byId("requirementReportIssue").focus();
+    return;
+  }
+  const stageValue = byId("requirementReportStage").value;
+  const stage = REQUIREMENT_REPORT_STAGES.has(stageValue) ? stageValue : "DEV";
+  state.requirementIssue = issueNumber;
+  state.requirementStage = stage;
+  saveState();
+  byId("requirementReportIssue").value = issueNumber;
+
+  const generate = byId("requirementReportGenerate");
+  generate.disabled = true;
+  generate.textContent = "讀取 Jira 中…";
+  byId("requirementReportCopy").disabled = true;
+  byId("requirementReportEdit").disabled = true;
+  byId("requirementReportState").textContent = "產生中";
+  byId("requirementReportState").classList.remove("ready");
+  setRequirementReportStatus(`正在讀取 GSI-${issueNumber} 的 Jira 資料…`);
+  try {
+    const response = await fetch("/api/jira/requirement-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ issue: `GSI-${issueNumber}`, stage })
+    });
+    const data = await response.json().catch(() => ({ ok: false, message: `Jira 資料讀取失敗（HTTP ${response.status}）` }));
+    if (response.status === 401) {
+      jiraConnection.connected = false;
+      renderJiraConnection();
+    }
+    if (!response.ok || !data.ok) throw new Error(data.message || "Jira 資料讀取失敗");
+
+    byId("requirementReportOutput").value = data.content || "";
+    setRequirementReportEditing(false);
+    byId("requirementReportCopy").disabled = !data.content;
+    byId("requirementReportEdit").disabled = !data.content;
+    byId("requirementReportState").textContent = "已產生";
+    byId("requirementReportState").classList.add("ready");
+    const participants = Array.isArray(data.participants) ? data.participants : [];
+    const unmapped = Array.isArray(data.unmappedParticipants) ? data.unmappedParticipants : [];
+    const participantText = participants.length ? participants.join("、") : "未設定";
+    const unmappedText = unmapped.length ? `；未設定 Telegram 帳號：${unmapped.join("、")}` : "";
+    const bugText = stage.endsWith("_REJECT") ? `｜關聯 BUG：${Number(data.bugCount || 0)} 張` : "";
+    byId("requirementReportMeta").textContent = `${data.issue}｜${data.summary}｜參與人員：${participantText}${unmappedText}${bugText}`;
+    setRequirementReportStatus("回報內容已產生，不會自動發送。", unmapped.length && stage !== "STG" ? "error" : "ok");
+  } catch (error) {
+    byId("requirementReportOutput").value = "";
+    setRequirementReportEditing(false);
+    byId("requirementReportCopy").disabled = true;
+    byId("requirementReportEdit").disabled = true;
+    byId("requirementReportState").textContent = "產生失敗";
+    byId("requirementReportMeta").textContent = "Jira 標題與參與人員讀取失敗。";
+    setRequirementReportStatus(error instanceof Error ? error.message : "Jira 資料讀取失敗", "error");
+  } finally {
+    generate.disabled = false;
+    generate.textContent = "產生回報";
+  }
+}
+
+async function copyRequirementReport() {
+  const raw = byId("requirementReportOutput").value.trim();
+  if (!raw) return;
+  let richCopy = false;
+  if (navigator.clipboard.write && window.ClipboardItem) {
+    try {
+      const html = reportContentElement(raw).innerHTML;
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([raw], { type: "text/plain" })
+      })]);
+      richCopy = true;
+    } catch {
+      richCopy = false;
+    }
+  }
+  if (!richCopy) await navigator.clipboard.writeText(raw);
+  setRequirementReportStatus(richCopy ? "已複製為 TG 超連結格式，尚未發送。" : "已複製文字；目前瀏覽器未支援超連結剪貼簿。", richCopy ? "ok" : "error");
+}
+
 function getWeekDates(value) {
   const base = value ? new Date(`${value}T12:00:00`) : new Date();
   const offset = base.getDay() === 0 ? -6 : 1 - base.getDay();
@@ -975,6 +1121,20 @@ byId("jiraConnect").addEventListener("click", connectJira);
 byId("jiraDisconnect").addEventListener("click", disconnectJira);
 byId("jiraCreateIssue").addEventListener("click", createJiraIssue);
 byId("openJiraCreate").addEventListener("click", () => window.open(`${state.jiraBaseUrl.replace(/\/$/, "")}/secure/CreateIssue.jspa`, "_blank", "noopener"));
+byId("requirementReportForm").addEventListener("submit", (event) => { event.preventDefault(); generateRequirementReport(); });
+byId("requirementReportIssue").addEventListener("input", (event) => {
+  const value = normalizeIssueNumber(event.target.value);
+  if (event.target.value !== value) event.target.value = value;
+  state.requirementIssue = value;
+  saveState();
+});
+byId("requirementReportStage").addEventListener("change", (event) => {
+  state.requirementStage = event.target.value;
+  saveState();
+});
+byId("requirementConnectJira").addEventListener("click", connectJira);
+byId("requirementReportEdit").addEventListener("click", () => setRequirementReportEditing(!requirementReportEditing));
+byId("requirementReportCopy").addEventListener("click", copyRequirementReport);
 byId("weeklyAdd").addEventListener("click", addWeeklySources);
 byId("weeklyClear").addEventListener("click", clearWeekly);
 byId("weeklyGenerate").addEventListener("click", generateWeeklyOutput);
@@ -988,6 +1148,8 @@ initializeAssignees();
 updateBugMeta();
 consumeJiraRedirectResult();
 byId("jiraBaseUrl").value = state.jiraBaseUrl;
+byId("requirementReportIssue").value = state.requirementIssue;
+byId("requirementReportStage").value = state.requirementStage;
 refreshBugSites("set_r017｜R017");
 refreshBugUrls("https://agent-gsi2.gsiwl.com");
 byId("weeklyDate").value = dateKey(new Date());

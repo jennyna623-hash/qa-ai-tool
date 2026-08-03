@@ -23,6 +23,9 @@
         <button class="nav-item active" type="button" data-view="bug">
           <span class="nav-icon">B</span><span>BUG 單模板</span>
         </button>
+        <button class="nav-item" type="button" data-view="requirement">
+          <span class="nav-icon">R</span><span>需求單回報</span>
+        </button>
         <button class="nav-item" type="button" data-view="weekly">
           <span class="nav-icon">W</span><span>周進度</span>
         </button>
@@ -171,6 +174,63 @@
         </div>
       </section>
 
+      <section class="view" id="view-requirement" data-title="需求單回報">
+        <div class="page-intro">
+          <div>
+            <h2>產生 Jira 需求驗收回報</h2>
+            <p>輸入 GSI 單號後，自動讀取標題、參與人員與關聯 BUG，產生可貼到 Telegram 的回報內容。</p>
+          </div>
+          <span class="ready-label">Jira Ready</span>
+        </div>
+
+        <div class="split-layout requirement-layout">
+          <form class="card" id="requirementReportForm">
+            <div class="section-heading">
+              <span>01</span>
+              <div><h3>回報條件</h3><p>回報只會產生草稿，不會自動發送訊息。</p></div>
+            </div>
+            <div class="form-grid">
+              <label class="field">
+                <span>Jira 單號</span>
+                <div class="prefix-input"><span>GSI-</span><input id="requirementReportIssue" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="184" required></div>
+              </label>
+              <label class="field">
+                <span>狀態</span>
+                <select id="requirementReportStage">
+                  <option value="DEV">DEV已完成</option>
+                  <option value="STG">STG已完成</option>
+                  <option value="DEV_REJECT">DEV驗退</option>
+                  <option value="STG_REJECT">STG驗退</option>
+                </select>
+              </label>
+            </div>
+            <div class="actions">
+              <button class="button primary" id="requirementReportGenerate" type="submit">產生回報</button>
+              <button class="button ghost" id="requirementConnectJira" type="button">連接 Jira</button>
+            </div>
+            <div class="report-status" id="requirementReportStatus" aria-live="polite">請輸入 Jira 單號並選擇狀態。</div>
+          </form>
+
+          <article class="card output-card sticky-card">
+            <div class="output-head">
+              <div><span>REPORT OUTPUT</span><h3>Telegram 回報草稿</h3></div>
+              <span id="requirementReportState" class="mini-state">尚未產生</span>
+            </div>
+            <div class="report-message-card">
+              <div class="report-toolbar">
+                <button class="button ghost" id="requirementReportEdit" type="button" disabled>編輯</button>
+                <button class="button soft" id="requirementReportCopy" type="button" disabled>複製到 TG</button>
+              </div>
+              <div class="report-preview" id="requirementReportPreview">
+                <p class="description-preview-empty">尚未產生。</p>
+              </div>
+              <textarea class="report-editor hidden" id="requirementReportOutput" rows="13"></textarea>
+            </div>
+            <div class="field-note" id="requirementReportMeta">Jira 標題與參與人員尚未讀取。</div>
+          </article>
+        </div>
+      </section>
+
       <section class="view" id="view-weekly" data-title="周進度">
         <div class="page-intro">
           <div><h2>整理本周工作進度</h2><p>目前可手動分類與輸出；Jira／Notion API 會在第二階段接上。</p></div>
@@ -232,8 +292,8 @@
           <span class="ready-label">V1</span>
         </div>
         <div class="status-grid">
-          <article class="status-card done"><span>已完成</span><h3>雲端前端</h3><p>BUG 模板、同事設定、周進度手動彙整及本機瀏覽器保存。</p></article>
-          <article class="status-card done"><span>已完成</span><h3>Jira API</h3><p>OAuth 安全連接、建立 BUG、截圖附件、自動選擇受託人及關聯主單。</p></article>
+          <article class="status-card done"><span>已完成</span><h3>雲端前端</h3><p>BUG 模板、需求單回報、同事設定、周進度手動彙整及本機瀏覽器保存。</p></article>
+          <article class="status-card done"><span>已完成</span><h3>Jira API</h3><p>OAuth 安全連接、建立 BUG、截圖附件、需求回報讀取、自動選擇受託人及關聯主單。</p></article>
           <article class="status-card next"><span>下一階段</span><h3>Notion API</h3><p>讀取授權頁面並將內容加入周進度分類。</p></article>
           <article class="status-card blocked"><span>需改造</span><h3>網站自動登入</h3><p>Cloudflare 無法啟動本機 Chrome；需改用官方 API 或獨立瀏覽器服務。</p></article>
         </div>
