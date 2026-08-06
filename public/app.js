@@ -850,17 +850,21 @@ function notionWeeklyContentElement(raw) {
     if (sectionIndex > 0) container.appendChild(document.createElement("br"));
 
     const section = document.createElement("div");
-    sectionText.split(/\r?\n/).forEach((line, lineIndex) => {
-      const row = document.createElement("div");
-      if (lineIndex === 0) {
-        const heading = document.createElement("strong");
-        appendMarkdownLine(heading, line);
-        row.appendChild(heading);
-      } else {
-        appendMarkdownLine(row, line);
-      }
-      section.appendChild(row);
+    const [headingText, ...itemLines] = sectionText.split(/\r?\n/);
+    const headingRow = document.createElement("div");
+    const heading = document.createElement("strong");
+    appendMarkdownLine(heading, headingText);
+    headingRow.appendChild(heading);
+    section.appendChild(headingRow);
+
+    const list = document.createElement("ol");
+    itemLines.forEach((line) => {
+      const item = document.createElement("li");
+      const itemText = line.replace(/^[\s　]*\d+[、.]\s*/, "");
+      appendMarkdownLine(item, itemText);
+      list.appendChild(item);
     });
+    if (list.children.length) section.appendChild(list);
     container.appendChild(section);
   });
   return container;
@@ -1314,10 +1318,9 @@ function loadWeekly() {
   const dates = getWeekDates(byId("weeklyDate").value);
   const data = currentWeeklyData();
   byId("weeklyReporter").value = WEEKLY_REPORTERS.includes(data.reporter) ? data.reporter : "Jenny";
-  byId("weeklyOutput").value = data.output || "";
-  renderWeeklyOutputPreview(data.output || "");
   byId("weeklyRange").textContent = `${shortDate(dates[0])}－${shortDate(dates[4])}`;
   renderWeeklyBoard();
+  generateWeeklyOutput();
 }
 
 function renderWeeklyOutputPreview(raw) {
