@@ -12,7 +12,9 @@ import {
 } from "../../_lib/jira.js";
 
 const WEEKLY_GROUPS = new Set([
+  "DEV 待測試",
   "DEV 測試中",
+  "STG 待測試",
   "STG 測試中",
   "待修正",
   "待進版 PROD",
@@ -30,6 +32,8 @@ export function weeklyGroup(statusName, categoryKey = "") {
   const status = String(statusName || "").trim().toLowerCase();
   const category = String(categoryKey || "").trim().toLowerCase();
   if (/驗退|退回|待修|修正|重開|reopen|re-open|blocked|阻塞|駁回|失敗/.test(status)) return "待修正";
+  if (/stg.*待.*測試|待.*stg.*測試/.test(status)) return "STG 待測試";
+  if (/dev.*待.*測試|待.*dev.*測試/.test(status)) return "DEV 待測試";
   if (/stg|stage|測試站/.test(status)) {
     if (/完成|通過|passed|ready|待.*prod|進版|上線/.test(status)) return "待進版 PROD";
     return "STG 測試中";
