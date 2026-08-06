@@ -203,7 +203,7 @@
         <div class="page-intro">
           <div>
             <h2>產生 Jira 需求驗收回報</h2>
-            <p>輸入 GSI 單號後，自動讀取標題、參與人員與關聯 BUG，產生可貼到 Telegram 的回報內容。</p>
+            <p>輸入一筆或多筆 GSI 單號後，自動讀取標題、參與人員與關聯 BUG，合併產生可貼到 Telegram 的回報內容。</p>
           </div>
           <span class="ready-label">Jira Ready</span>
         </div>
@@ -216,8 +216,9 @@
             </div>
             <div class="form-grid">
               <label class="field">
-                <span>Jira 單號</span>
-                <div class="prefix-input"><span>GSI-</span><input id="requirementReportIssue" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="184" required></div>
+                <span>Jira 單號（可多筆）</span>
+                <textarea id="requirementReportIssue" rows="4" placeholder="481&#10;GSI-482&#10;https://gamingsoft.atlassian.net/browse/GSI-483" required></textarea>
+                <small>可用換行、空白或逗號分隔，一次最多 20 筆。</small>
               </label>
               <label class="field">
                 <span>狀態</span>
@@ -233,7 +234,7 @@
               <button class="button primary" id="requirementReportGenerate" type="submit">產生回報</button>
               <button class="button ghost" id="requirementConnectJira" type="button">連接 Jira</button>
             </div>
-            <div class="report-status" id="requirementReportStatus" aria-live="polite">請輸入 Jira 單號並選擇狀態。</div>
+            <div class="report-status" id="requirementReportStatus" aria-live="polite">請輸入一筆或多筆 Jira 單號並選擇狀態。</div>
           </form>
 
           <article class="card output-card sticky-card">
@@ -296,7 +297,7 @@
           <div id="weeklyOutputPreview" class="weekly-output-preview" aria-label="周進度彙整內容"></div>
           <textarea id="weeklyOutput" class="weekly-output-source" aria-hidden="true" tabindex="-1"></textarea>
           <div class="inline-actions">
-            <button class="button primary" type="button" id="weeklyGenerate">重新整理彙整</button>
+            <button class="button primary" type="button" id="weeklyGenerate">更新 Jira 狀態並彙整</button>
             <button class="button soft" type="button" id="weeklyCopy">複製 Notion 格式</button>
           </div>
         </article>

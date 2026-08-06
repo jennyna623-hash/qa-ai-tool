@@ -88,7 +88,7 @@ function loadState() {
     return {
       defaultAssignee: saved.defaultAssignee || "Edward",
       jiraBaseUrl: saved.jiraBaseUrl || "https://gamingsoft.atlassian.net",
-      requirementIssue: normalizeIssueNumber(saved.requirementIssue || ""),
+      requirementIssue: String(saved.requirementIssue || ""),
       requirementStage: REQUIREMENT_REPORT_STAGES.has(saved.requirementStage) ? saved.requirementStage : "DEV",
       weekly: saved.weekly && typeof saved.weekly === "object" ? saved.weekly : {}
     };
@@ -876,18 +876,24 @@ function setRequirementReportEditing(editing) {
 }
 
 async function generateRequirementReport() {
-  const issueNumber = normalizeIssueNumber(byId("requirementReportIssue").value);
-  if (!issueNumber) {
-    setRequirementReportStatus("請輸入正確的 Jira 單號。", "error");
+  const issueNumbers = extractSources(byId("requirementReportIssue").value).map((source) => normalizeIssueNumber(source.key));
+  if (!issueNumbers.length) {
+    setRequirementReportStatus("請輸入至少一筆正確的 Jira 單號。", "error");
+    byId("requirementReportIssue").focus();
+    return;
+  }
+  if (issueNumbers.length > 20) {
+    setRequirementReportStatus("一次最多產生 20 筆需求回報。", "error");
     byId("requirementReportIssue").focus();
     return;
   }
   const stageValue = byId("requirementReportStage").value;
   const stage = REQUIREMENT_REPORT_STAGES.has(stageValue) ? stageValue : "DEV";
-  state.requirementIssue = issueNumber;
+  const normalizedIssues = issueNumbers.join("\n");
+  state.requirementIssue = normalizedIssues;
   state.requirementStage = stage;
   saveState();
-  byId("requirementReportIssue").value = issueNumber;
+  byId("requirementReportIssue").value = normalizedIssues;
 
   const generate = byId("requirementReportGenerate");
   generate.disabled = true;
@@ -896,33 +902,52 @@ async function generateRequirementReport() {
   byId("requirementReportEdit").disabled = true;
   byId("requirementReportState").textContent = "產生中";
   byId("requirementReportState").classList.remove("ready");
-  setRequirementReportStatus(`正在讀取 GSI-${issueNumber} 的 Jira 資料…`);
+  setRequirementReportStatus(`準備讀取 ${issueNumbers.length} 筆 Jira 資料…`);
   try {
-    const response = await fetch("/api/jira/requirement-report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ issue: `GSI-${issueNumber}`, stage })
-    });
-    const data = await response.json().catch(() => ({ ok: false, message: `Jira 資料讀取失敗（HTTP ${response.status}）` }));
-    if (response.status === 401) {
-      jiraConnection.connected = false;
-      renderJiraConnection();
+    const reports = [];
+    const failures = [];
+    for (let index = 0; index < issueNumbers.length; index += 1) {
+      const issueKey = `GSI-${issueNumbers[index]}`;
+      setRequirementReportStatus(`正在讀取 ${issueKey}（${index + 1}/${issueNumbers.length}）…`);
+      try {
+        const response = await fetch("/api/jira/requirement-report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ issue: issueKey, stage })
+        });
+        const data = await response.json().catch(() => ({ ok: false, message: `Jira 資料讀取失敗（HTTP ${response.status}）` }));
+        if (response.status === 401) {
+          jiraConnection.connected = false;
+          renderJiraConnection();
+        }
+        if (!response.ok || !data.ok) throw new Error(data.message || "Jira 資料讀取失敗");
+        reports.push(data);
+      } catch (error) {
+        failures.push(`${issueKey}：${error instanceof Error ? error.message : "讀取失敗"}`);
+      }
     }
-    if (!response.ok || !data.ok) throw new Error(data.message || "Jira 資料讀取失敗");
+    if (!reports.length) throw new Error(failures.join("；") || "Jira 資料讀取失敗");
 
-    byId("requirementReportOutput").value = data.content || "";
+    const content = reports.map((report) => String(report.content || "").trim()).filter(Boolean).join("\n\n");
+    byId("requirementReportOutput").value = content;
     setRequirementReportEditing(false);
-    byId("requirementReportCopy").disabled = !data.content;
-    byId("requirementReportEdit").disabled = !data.content;
+    byId("requirementReportCopy").disabled = !content;
+    byId("requirementReportEdit").disabled = !content;
     byId("requirementReportState").textContent = "已產生";
     byId("requirementReportState").classList.add("ready");
-    const participants = Array.isArray(data.participants) ? data.participants : [];
-    const unmapped = Array.isArray(data.unmappedParticipants) ? data.unmappedParticipants : [];
+    const participants = unique(reports.flatMap((report) => Array.isArray(report.participants) ? report.participants : []));
+    const unmapped = unique(reports.flatMap((report) => Array.isArray(report.unmappedParticipants) ? report.unmappedParticipants : []));
     const participantText = participants.length ? participants.join("、") : "未設定";
     const unmappedText = unmapped.length ? `；未設定 Telegram 帳號：${unmapped.join("、")}` : "";
-    const bugText = stage.endsWith("_REJECT") ? `｜關聯 BUG：${Number(data.bugCount || 0)} 張` : "";
-    byId("requirementReportMeta").textContent = `${data.issue}｜${data.summary}｜參與人員：${participantText}${unmappedText}${bugText}`;
-    setRequirementReportStatus("回報內容已產生，不會自動發送。", unmapped.length && stage !== "STG" ? "error" : "ok");
+    const bugCount = reports.reduce((total, report) => total + Number(report.bugCount || 0), 0);
+    const bugText = stage.endsWith("_REJECT") ? `｜關聯 BUG：${bugCount} 張` : "";
+    const issueText = reports.map((report) => report.issue).join("、");
+    byId("requirementReportMeta").textContent = `已產生 ${reports.length} 筆｜${issueText}｜參與人員：${participantText}${unmappedText}${bugText}`;
+    if (failures.length) {
+      setRequirementReportStatus(`已產生 ${reports.length} 筆；${failures.length} 筆失敗：${failures.join("；")}`, "error");
+    } else {
+      setRequirementReportStatus(`已產生 ${reports.length} 筆回報，不會自動發送。`, unmapped.length && stage !== "STG" ? "error" : "ok");
+    }
   } catch (error) {
     byId("requirementReportOutput").value = "";
     setRequirementReportEditing(false);
@@ -1277,6 +1302,67 @@ function generateWeeklyOutput() {
   saveWeeklyForm();
 }
 
+async function refreshWeeklyOutput() {
+  const data = currentWeeklyData();
+  const jiraItems = data.items.filter((item) => item.type === "jira" && item.key);
+  if (!jiraItems.length) {
+    generateWeeklyOutput();
+    setWeeklySyncStatus("目前沒有 Jira 項目；已重新彙整手動項目。", "ok");
+    return;
+  }
+  if (!jiraConnection.connected) {
+    setWeeklySyncStatus("請先連接 Jira，才能更新最新狀態。", "error");
+    if (jiraConnection.configured) connectJira();
+    else showToast(jiraConnection.message || "請先完成 Jira OAuth 設定");
+    return;
+  }
+
+  const refreshButton = byId("weeklyGenerate");
+  refreshButton.disabled = true;
+  refreshButton.textContent = "更新 Jira 中…";
+  setWeeklySyncStatus(`正在重新讀取 ${jiraItems.length} 筆 Jira 最新狀態…`);
+  try {
+    const response = await fetch("/api/jira/weekly", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ issues: jiraItems.map((item) => item.key) })
+    });
+    const result = await response.json().catch(() => ({ ok: false, message: `Jira 資料讀取失敗（HTTP ${response.status}）` }));
+    if (response.status === 401) {
+      jiraConnection.connected = false;
+      renderJiraConnection();
+    }
+    if (!response.ok || !result.ok) throw new Error(result.message || "Jira 資料讀取失敗");
+
+    let updated = 0;
+    result.items.forEach((jiraItem) => {
+      const existing = data.items.find((item) => item.type === "jira" && item.key === jiraItem.key);
+      if (!existing) return;
+      Object.assign(existing, jiraItem, { type: "jira" });
+      updated += 1;
+    });
+    saveWeeklyForm();
+    renderWeeklyBoard();
+    generateWeeklyOutput();
+
+    const errors = Array.isArray(result.errors) ? result.errors : [];
+    if (errors.length) {
+      setWeeklySyncStatus(`已更新 ${updated} 筆；${errors.length} 筆保留原資料：${errors.join("；")}`, "error");
+      showToast(`已更新 ${updated} 筆，${errors.length} 筆失敗`);
+    } else {
+      setWeeklySyncStatus(`已更新 ${updated} 筆 Jira 最新狀態並重新彙整。`, "ok");
+      showToast("Jira 狀態已更新");
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Jira 資料讀取失敗";
+    setWeeklySyncStatus(message, "error");
+    showToast(message);
+  } finally {
+    refreshButton.disabled = false;
+    refreshButton.textContent = "更新 Jira 狀態並彙整";
+  }
+}
+
 async function copyWeeklyOutput() {
   const raw = byId("weeklyOutput").value.trim();
   if (!raw) {
@@ -1431,9 +1517,7 @@ byId("bugTelegramEdit").addEventListener("click", () => setBugTelegramEditing(!b
 byId("bugTelegramCopy").addEventListener("click", copyBugTelegramReport);
 byId("requirementReportForm").addEventListener("submit", (event) => { event.preventDefault(); generateRequirementReport(); });
 byId("requirementReportIssue").addEventListener("input", (event) => {
-  const value = normalizeIssueNumber(event.target.value);
-  if (event.target.value !== value) event.target.value = value;
-  state.requirementIssue = value;
+  state.requirementIssue = event.target.value;
   saveState();
 });
 byId("requirementReportStage").addEventListener("change", (event) => {
@@ -1447,7 +1531,7 @@ byId("weeklyConnectJira").addEventListener("click", connectJira);
 byId("weeklyAdd").addEventListener("click", addWeeklySources);
 byId("weeklyManualAdd").addEventListener("click", addWeeklyManualItem);
 byId("weeklyClear").addEventListener("click", clearWeekly);
-byId("weeklyGenerate").addEventListener("click", generateWeeklyOutput);
+byId("weeklyGenerate").addEventListener("click", refreshWeeklyOutput);
 byId("weeklyCopy").addEventListener("click", copyWeeklyOutput);
 byId("weeklyDate").addEventListener("change", loadWeekly);
 byId("weeklyReporter").addEventListener("change", saveWeeklyForm);
