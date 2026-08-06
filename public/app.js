@@ -836,6 +836,17 @@ function reportContentElement(raw) {
   return container;
 }
 
+function notionWeeklyContentElement(raw) {
+  const container = document.createElement("div");
+  String(raw || "").split(/\r?\n/).forEach((line) => {
+    const paragraph = document.createElement("p");
+    if (line) appendMarkdownLine(paragraph, line);
+    else paragraph.appendChild(document.createElement("br"));
+    container.appendChild(paragraph);
+  });
+  return container;
+}
+
 function renderRequirementReportPreview() {
   const output = byId("requirementReportOutput").value.trim();
   const preview = byId("requirementReportPreview");
@@ -1248,19 +1259,16 @@ function renderWeeklyOutputPreview(raw) {
 
 function generateWeeklyOutput() {
   const data = currentWeeklyData();
-  const dates = getWeekDates(byId("weeklyDate").value);
-  const lines = [`${shortDate(dates[0])}-${shortDate(dates[4])}`];
-  const reporter = byId("weeklyReporter").value.trim();
-  if (reporter) lines.push("", `人員｜${reporter}`);
+  const lines = [];
   WEEKLY_GROUPS.forEach((group) => {
     const items = data.items.filter((item) => item.group === group);
     if (!items.length) return;
-    lines.push("", `${group}（${items.length}）`);
+    if (lines.length) lines.push("");
+    lines.push(`${group}（${items.length}）`);
     items.forEach((item, index) => {
       const title = String(item.summary || item.key || "未命名項目").replace(/\\/g, "\\\\").replace(/\]/g, "\\]");
       const linkedTitle = /^https?:\/\//i.test(item.url || "") ? `[${title}](${item.url})` : title;
-      const status = item.type === "manual" ? "" : `｜${item.status || "狀態未填"}`;
-      lines.push(`${index + 1}. ${linkedTitle}${status}`);
+      lines.push(`${index + 1}、${linkedTitle}`);
     });
   });
   const output = lines.join("\n");
@@ -1275,11 +1283,7 @@ async function copyWeeklyOutput() {
     showToast("目前沒有可複製的周進度內容");
     return;
   }
-  const rich = document.createElement("div");
-  raw.split("\n").forEach((line, index, lines) => {
-    appendMarkdownLine(rich, line);
-    if (index < lines.length - 1) rich.appendChild(document.createElement("br"));
-  });
+  const rich = notionWeeklyContentElement(raw);
   let richCopy = false;
   if (navigator.clipboard.write && window.ClipboardItem) {
     try {
@@ -1293,7 +1297,7 @@ async function copyWeeklyOutput() {
     }
   }
   if (!richCopy) await navigator.clipboard.writeText(raw);
-  showToast(richCopy ? "已複製 TG 超連結格式" : "已複製 Markdown 格式");
+  showToast(richCopy ? "已複製 Notion 相容格式" : "已複製文字格式");
 }
 
 function clearWeekly() {
