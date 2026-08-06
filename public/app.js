@@ -820,7 +820,14 @@ function appendMarkdownLine(target, line) {
     link.href = match[2];
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = match[1].replace(/\\\]/g, "]").replace(/\\\\/g, "\\");
+    const label = match[1].replace(/\\\]/g, "]").replace(/\\\\/g, "\\");
+    if (label.startsWith("**") && label.endsWith("**") && label.length > 4) {
+      const strong = document.createElement("strong");
+      strong.textContent = label.slice(2, -2);
+      link.appendChild(strong);
+    } else {
+      link.textContent = label;
+    }
     target.appendChild(link);
     cursor = pattern.lastIndex;
   }
@@ -873,6 +880,41 @@ function setRequirementReportEditing(editing) {
   } else {
     renderRequirementReportPreview();
   }
+}
+
+function combinedRequirementReportContent(reports, stage) {
+  if (reports.length === 1) return String(reports[0].content || "").trim();
+
+  const lines = reports.map((report, index) => {
+    const title = String(report.summary || report.issue || "未命名需求").replace(/\\/g, "\\\\").replace(/]/g, "\\]");
+    const url = String(report.link || "").match(/\]\((https?:\/\/[^)]+)\)$/)?.[1]
+      || `${state.jiraBaseUrl.replace(/\/$/, "")}/browse/${encodeURIComponent(report.issue)}`;
+    return `${index + 1}.[**${title}**](${url})`;
+  });
+
+  const statusText = String(reports[0]?.statusText || "").trim();
+  if (statusText) lines.push("", statusText);
+
+  const ccMentions = unique(reports.flatMap((report) => String(report.ccText || "")
+    .replace(/^CC:\s*/i, "")
+    .split(/\s+/)
+    .filter(Boolean)));
+  if (ccMentions.length) lines.push(`CC: ${ccMentions.join(" ")}`);
+
+  if (stage.endsWith("_REJECT")) {
+    const bugs = reports.flatMap((report) => Array.isArray(report.relatedBugs) ? report.relatedBugs : [])
+      .filter((bug, index, all) => all.findIndex((item) => item.url === bug.url) === index);
+    lines.push("", "BUG列表");
+    if (bugs.length) {
+      bugs.forEach((bug, index) => {
+        const title = String(bug.summary || "未命名 BUG").replace(/\\/g, "\\\\").replace(/]/g, "\\]");
+        lines.push(`${index + 1}. [${title}](${bug.url})`);
+      });
+    } else {
+      lines.push("目前未找到關聯 BUG 單");
+    }
+  }
+  return lines.join("\n");
 }
 
 async function generateRequirementReport() {
@@ -928,7 +970,7 @@ async function generateRequirementReport() {
     }
     if (!reports.length) throw new Error(failures.join("；") || "Jira 資料讀取失敗");
 
-    const content = reports.map((report) => String(report.content || "").trim()).filter(Boolean).join("\n\n");
+    const content = combinedRequirementReportContent(reports, stage);
     byId("requirementReportOutput").value = content;
     setRequirementReportEditing(false);
     byId("requirementReportCopy").disabled = !content;
