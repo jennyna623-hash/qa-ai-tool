@@ -845,11 +845,23 @@ function reportContentElement(raw) {
 
 function notionWeeklyContentElement(raw) {
   const container = document.createElement("div");
-  String(raw || "").split(/\r?\n/).forEach((line) => {
-    const paragraph = document.createElement("p");
-    if (line) appendMarkdownLine(paragraph, line);
-    else paragraph.appendChild(document.createElement("br"));
-    container.appendChild(paragraph);
+  const sections = String(raw || "").trim().split(/\r?\n\s*\r?\n/).filter(Boolean);
+  sections.forEach((sectionText, sectionIndex) => {
+    if (sectionIndex > 0) container.appendChild(document.createElement("br"));
+
+    const section = document.createElement("div");
+    sectionText.split(/\r?\n/).forEach((line, lineIndex) => {
+      const row = document.createElement("div");
+      if (lineIndex === 0) {
+        const heading = document.createElement("strong");
+        appendMarkdownLine(heading, line);
+        row.appendChild(heading);
+      } else {
+        appendMarkdownLine(row, line);
+      }
+      section.appendChild(row);
+    });
+    container.appendChild(section);
   });
   return container;
 }
@@ -1335,7 +1347,7 @@ function generateWeeklyOutput() {
     items.forEach((item, index) => {
       const title = String(item.summary || item.key || "未命名項目").replace(/\\/g, "\\\\").replace(/\]/g, "\\]");
       const linkedTitle = /^https?:\/\//i.test(item.url || "") ? `[${title}](${item.url})` : title;
-      lines.push(`${index + 1}、${linkedTitle}`);
+      lines.push(`　${index + 1}、${linkedTitle}`);
     });
   });
   const output = lines.join("\n");
