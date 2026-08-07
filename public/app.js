@@ -1147,7 +1147,7 @@ async function importWeeklyProgress(automatic = false) {
   button.textContent = "匯入中…";
   setWeeklySyncStatus(`正在從共用進度整理 ${reporter} 的 Jira…`);
   try {
-    const result = await progressApi("/api/progress");
+    const result = await progressApi("/api/jira/progress");
     progressItems = Array.isArray(result.items) ? result.items : [];
     progressLoaded = true;
     const matched = progressItems.filter((item) => progressBelongsToReporter(item, reporter) && progressIsRelevantToWeek(item));
@@ -1734,7 +1734,7 @@ async function loadProgressItems() {
   }
   setProgressStatus("正在讀取團隊共用進度…");
   try {
-    const data = await progressApi("/api/progress");
+    const data = await progressApi("/api/jira/progress");
     progressItems = Array.isArray(data.items) ? data.items : [];
     progressLoaded = true;
     renderProgressTable();
@@ -1761,7 +1761,7 @@ async function addProgressSources() {
   button.textContent = "加入中…";
   setProgressStatus(`正在讀取並加入 ${sources.length} 筆 Jira 單…`);
   try {
-    const data = await progressApi("/api/progress", {
+    const data = await progressApi("/api/jira/progress", {
       method: "POST",
       body: JSON.stringify({ issues: sources.map((source) => source.key) })
     });
@@ -1786,7 +1786,7 @@ async function syncProgress(quiet = false) {
   button.textContent = "同步中…";
   if (!quiet) setProgressStatus("正在逐筆比對 Jira 最新狀態與完成日期…");
   try {
-    const data = await progressApi("/api/progress/sync", { method: "POST", body: "{}" });
+    const data = await progressApi("/api/jira/progress/sync", { method: "POST", body: "{}" });
     progressItems = Array.isArray(data.items) ? data.items : [];
     progressLoaded = true;
     renderProgressTable();
@@ -1807,7 +1807,7 @@ async function updateProgressItem(item, environment, note) {
   environment.disabled = true;
   note.disabled = true;
   try {
-    const data = await progressApi("/api/progress/update", {
+    const data = await progressApi("/api/jira/progress/update", {
       method: "POST",
       body: JSON.stringify({ id: item.id, testEnvironment: environment.value, note: note.value })
     });
@@ -1825,7 +1825,7 @@ async function updateProgressItem(item, environment, note) {
 async function removeProgressItem(item) {
   if (!window.confirm(`確定要從共用進度移除 ${item.jira_key}？`)) return;
   try {
-    await progressApi("/api/progress/delete", {
+    await progressApi("/api/jira/progress/delete", {
       method: "POST",
       body: JSON.stringify({ id: item.id })
     });
