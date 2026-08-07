@@ -39,6 +39,15 @@ let schemaReady = false;
 let cachedQaTesterFieldId = "";
 let qaTesterFieldLookupDone = false;
 
+export function shouldSkipLinkedBugLookup(issueKey, env = {}) {
+  const configured = String(env.PROGRESS_SKIP_LINKED_BUGS || "GSI-214")
+    .toUpperCase()
+    .split(/[\s,，;；]+/)
+    .map((key) => key.trim())
+    .filter(Boolean);
+  return configured.includes(String(issueKey || "").trim().toUpperCase());
+}
+
 export function progressDatabase(env) {
   return env.PROGRESS_DB || null;
 }
@@ -172,7 +181,13 @@ async function qaTesterFieldId(session, env) {
 
 export async function readProgressIssue(session, issueKey, env = {}) {
   const qaField = await qaTesterFieldId(session, env);
-  const requestedFields = ["summary", "status", "issuelinks", "subtasks", qaField].filter(Boolean).join(",");
+  const skipLinkedBugs = shouldSkipLinkedBugLookup(issueKey, env);
+  const requestedFields = [
+    "summary",
+    "status",
+    ...(skipLinkedBugs ? [] : ["issuelinks", "subtasks"]),
+    qaField
+  ].filter(Boolean).join(",");
   const response = await jiraFetch(
     session,
     `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${encodeURIComponent(requestedFields)}`
@@ -182,7 +197,7 @@ export async function readProgressIssue(session, issueKey, env = {}) {
   const issue = await response.json();
   const status = String(issue?.fields?.status?.name || "狀態未設定").trim();
   const statusCategory = String(issue?.fields?.status?.statusCategory?.key || "").trim();
-  const linkedBugs = relatedBugItems(issue?.fields, session.siteUrl);
+  const linkedBugs = skipLinkedBugs ? [] : relatedBugItems(issue?.fields, session.siteUrl);
   return {
     jiraKey: issueKey,
     jiraUrl: `${session.siteUrl}/browse/${encodeURIComponent(issueKey)}`,

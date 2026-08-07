@@ -5,6 +5,7 @@
   "private": true,
   "description": "GSI QA AI 工具 Cloudflare Pages 雲端版",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
     "preview": "node preview-server.mjs",
     "dev": "wrangler pages dev public",
     "deploy": "wrangler pages deploy public"

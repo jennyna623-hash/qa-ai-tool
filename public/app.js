@@ -1,5 +1,6 @@
 const STORAGE_KEY = "gsi-ai-tools-cloud-v1";
 const WEEKLY_GROUPS = ["DEV 待測試", "DEV 測試中", "待進版STG", "STG 待測試", "STG 測試中", "待修正", "待進版 PROD", "已完成", "其他／待處理"];
+const PROGRESS_SYNC_BATCH_SIZE = 5;
 const WEEKLY_REPORTERS = ["Jenny", "Ben", "Guan"];
 const ASSIGNEES = ["Edward", "corey", "JOSEPH", "偉恩", "Ken", "KevinKao", "Will Zhang", "Simon Wu", "Jason hu"];
 const ASSIGNEE_TELEGRAM = {
@@ -1848,15 +1849,24 @@ async function addProgressSources() {
   button.textContent = "加入中…";
   setProgressStatus(`正在讀取並加入 ${sources.length} 筆 Jira 單…`);
   try {
-    const data = await progressApi("/api/jira/progress", {
-      method: "POST",
-      body: JSON.stringify({ issues: sources.map((source) => source.key) })
-    });
+    const issueKeys = sources.map((source) => source.key);
+    const errors = [];
+    let added = 0;
+    for (let offset = 0; offset < issueKeys.length; offset += PROGRESS_SYNC_BATCH_SIZE) {
+      const batch = issueKeys.slice(offset, offset + PROGRESS_SYNC_BATCH_SIZE);
+      button.textContent = `加入 ${Math.min(offset + batch.length, issueKeys.length)}/${issueKeys.length}…`;
+      const data = await progressApi("/api/jira/progress", {
+        method: "POST",
+        body: JSON.stringify({ issues: batch })
+      });
+      added += Number(data.count || 0);
+      if (Array.isArray(data.errors)) errors.push(...data.errors);
+    }
     byId("progressSources").value = "";
     await loadProgressItems();
-    const failed = Array.isArray(data.errors) ? data.errors.length : 0;
-    setProgressStatus(`已加入或更新 ${data.count} 筆，提測日依首次加入日期自動填寫${failed ? `；另有 ${failed} 筆失敗` : ""}。`, failed ? "error" : "ok");
-    showToast(`已加入 ${data.count} 筆 Jira 追蹤`);
+    const failed = errors.length;
+    setProgressStatus(`已加入或更新 ${added} 筆，提測日依首次加入日期自動填寫${failed ? `；另有 ${failed} 筆失敗` : ""}。`, failed ? "error" : "ok");
+    showToast(`已加入 ${added} 筆 Jira 追蹤`);
   } catch (error) {
     setProgressStatus(error instanceof Error ? error.message : "加入追蹤失敗", "error");
   } finally {
@@ -1873,12 +1883,33 @@ async function syncProgress(quiet = false) {
   button.textContent = "同步中…";
   if (!quiet) setProgressStatus("正在逐筆比對 Jira 最新狀態與完成日期…");
   try {
-    const data = await progressApi("/api/jira/progress/sync", { method: "POST", body: "{}" });
-    progressItems = Array.isArray(data.items) ? data.items : [];
+    const issueKeys = unique(progressItems.map((item) => String(item.jira_key || "").trim()).filter(Boolean));
+    const errors = [];
+    let synced = 0;
+    let latestItems = progressItems;
+    for (let offset = 0; offset < issueKeys.length; offset += PROGRESS_SYNC_BATCH_SIZE) {
+      const batch = issueKeys.slice(offset, offset + PROGRESS_SYNC_BATCH_SIZE);
+      const completed = Math.min(offset + batch.length, issueKeys.length);
+      button.textContent = `同步 ${completed}/${issueKeys.length}…`;
+      if (!quiet) setProgressStatus(`正在分批同步 Jira（${completed}/${issueKeys.length}）…`);
+      try {
+        const data = await progressApi("/api/jira/progress/sync", {
+          method: "POST",
+          body: JSON.stringify({ issues: batch })
+        });
+        synced += Number(data.synced || 0);
+        if (Array.isArray(data.errors)) errors.push(...data.errors);
+        if (Array.isArray(data.items)) latestItems = data.items;
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : `第 ${Math.floor(offset / PROGRESS_SYNC_BATCH_SIZE) + 1} 批同步失敗`);
+        if (!jiraConnection.connected) break;
+      }
+    }
+    progressItems = latestItems;
     progressLoaded = true;
     renderProgressTable();
-    const failed = Array.isArray(data.errors) ? data.errors.length : 0;
-    setProgressStatus(`已同步 ${data.synced} 筆 Jira；下次會在 5 分鐘後自動檢查${failed ? `，${failed} 筆失敗` : ""}。`, failed ? "error" : "ok");
+    const failed = errors.length;
+    setProgressStatus(`已分批同步 ${synced} 筆 Jira；下次會在 5 分鐘後自動檢查${failed ? `，${failed} 筆失敗` : ""}。`, failed ? "error" : "ok");
     byId("progressLastSync").textContent = `同步 ${progressTimeLabel()}`;
     byId("progressLastSync").classList.add("ready");
   } catch (error) {
