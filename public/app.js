@@ -1,5 +1,5 @@
 const STORAGE_KEY = "gsi-ai-tools-cloud-v1";
-const WEEKLY_GROUPS = ["DEV 待測試", "DEV 測試中", "STG 待測試", "STG 測試中", "待修正", "待進版 PROD", "已完成", "其他／待處理"];
+const WEEKLY_GROUPS = ["DEV 待測試", "DEV 測試中", "待進版STG", "STG 待測試", "STG 測試中", "待修正", "待進版 PROD", "已完成", "其他／待處理"];
 const WEEKLY_REPORTERS = ["Jenny", "Ben", "Guan"];
 const ASSIGNEES = ["Edward", "corey", "JOSEPH", "偉恩", "Ken", "KevinKao", "Will Zhang", "Simon Wu", "Jason hu"];
 const ASSIGNEE_TELEGRAM = {
