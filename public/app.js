@@ -1611,11 +1611,59 @@ function filteredProgressItems() {
   const environment = byId("progressEnvironmentFilter").value;
   const status = byId("progressStatusFilter").value;
   return progressItems.filter((item) => {
-    const searchable = `${item.jira_key || ""} ${item.summary || ""}`.toLowerCase();
+    const bugSearch = progressLinkedBugs(item).map((bug) => `${bug.key || ""} ${bug.summary || ""} ${bug.status || ""}`).join(" ");
+    const searchable = `${item.jira_key || ""} ${item.summary || ""} ${bugSearch}`.toLowerCase();
     return (!keyword || searchable.includes(keyword))
       && (!environment || item.test_environment === environment)
       && (!status || item.jira_status === status);
   });
+}
+
+function progressLinkedBugs(item) {
+  if (Array.isArray(item?.linked_bugs)) return item.linked_bugs;
+  try {
+    const bugs = JSON.parse(String(item?.linked_bugs_json || "[]"));
+    return Array.isArray(bugs) ? bugs : [];
+  } catch {
+    return [];
+  }
+}
+
+function renderProgressBugs(row, item) {
+  const cell = document.createElement("td");
+  cell.className = "progress-bugs";
+  const bugs = progressLinkedBugs(item);
+  if (!bugs.length) {
+    cell.textContent = "—";
+    row.appendChild(cell);
+    return;
+  }
+
+  const ready = bugs.filter((bug) => Boolean(bug.regressionReady));
+  const badge = document.createElement("span");
+  badge.className = `progress-bug-badge${ready.length ? " ready" : ""}`;
+  badge.textContent = ready.length ? `↻ ${ready.length} 個缺陷可回歸` : `${bugs.length} 個缺陷｜尚無可回歸`;
+  cell.appendChild(badge);
+  if (ready.length) row.classList.add("has-regression-ready");
+
+  const list = document.createElement("div");
+  list.className = "progress-bug-list";
+  [...ready, ...bugs.filter((bug) => !bug.regressionReady)].slice(0, 3).forEach((bug) => {
+    const link = document.createElement("a");
+    link.href = bug.url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = `${bug.key}｜${bug.status || "狀態未設定"}`;
+    link.title = bug.summary || bug.key;
+    list.appendChild(link);
+  });
+  if (bugs.length > 3) {
+    const more = document.createElement("span");
+    more.textContent = `另有 ${bugs.length - 3} 筆`;
+    list.appendChild(more);
+  }
+  cell.appendChild(list);
+  row.appendChild(cell);
 }
 
 function progressCell(row, value, className = "") {
@@ -1667,6 +1715,7 @@ function renderProgressTable() {
     statusCell.appendChild(status);
     row.appendChild(statusCell);
 
+    renderProgressBugs(row, item);
     progressCell(row, String(item.qa_testers || "").trim() || "未指派", "progress-qa");
 
     const environmentCell = document.createElement("td");

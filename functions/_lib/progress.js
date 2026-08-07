@@ -9,6 +9,9 @@ const PROGRESS_SCHEMA_STATEMENTS = [
     jira_status TEXT NOT NULL,
     status_category TEXT NOT NULL DEFAULT '',
     tracking_group TEXT NOT NULL DEFAULT '其他／待處理',
+    linked_bugs_json TEXT NOT NULL DEFAULT '[]',
+    linked_bug_count INTEGER NOT NULL DEFAULT 0,
+    regression_bug_count INTEGER NOT NULL DEFAULT 0,
     qa_testers TEXT NOT NULL DEFAULT '',
     test_environment TEXT NOT NULL DEFAULT 'DEV',
     environment_manual INTEGER NOT NULL DEFAULT 0,
@@ -43,6 +46,13 @@ export function progressDatabase(env) {
 export async function ensureProgressSchema(db) {
   if (schemaReady) return;
   await db.batch(PROGRESS_SCHEMA_STATEMENTS.map((statement) => db.prepare(statement)));
+  const columnResult = await db.prepare("PRAGMA table_info(progress_items)").all();
+  const columns = new Set((columnResult.results || []).map((column) => String(column.name || "")));
+  const additions = [];
+  if (!columns.has("linked_bugs_json")) additions.push("ALTER TABLE progress_items ADD COLUMN linked_bugs_json TEXT NOT NULL DEFAULT '[]'");
+  if (!columns.has("linked_bug_count")) additions.push("ALTER TABLE progress_items ADD COLUMN linked_bug_count INTEGER NOT NULL DEFAULT 0");
+  if (!columns.has("regression_bug_count")) additions.push("ALTER TABLE progress_items ADD COLUMN regression_bug_count INTEGER NOT NULL DEFAULT 0");
+  if (additions.length) await db.batch(additions.map((statement) => db.prepare(statement)));
   schemaReady = true;
 }
 
@@ -110,6 +120,36 @@ function jiraPeople(value) {
   }).filter(Boolean))).join("、");
 }
 
+function relatedBugItems(fields, siteUrl) {
+  const candidates = [];
+  (Array.isArray(fields?.issuelinks) ? fields.issuelinks : []).forEach((link) => {
+    if (link?.outwardIssue) candidates.push(link.outwardIssue);
+    if (link?.inwardIssue) candidates.push(link.inwardIssue);
+  });
+  (Array.isArray(fields?.subtasks) ? fields.subtasks : []).forEach((issue) => candidates.push(issue));
+
+  const seen = new Set();
+  return candidates.flatMap((candidate) => {
+    const key = String(candidate?.key || "").trim().toUpperCase();
+    const summary = String(candidate?.fields?.summary || "").trim();
+    const issueType = String(candidate?.fields?.issuetype?.name || "").trim();
+    const status = String(candidate?.fields?.status?.name || "狀態未設定").trim();
+    const category = String(candidate?.fields?.status?.statusCategory?.key || "").trim();
+    const isBug = /bug|defect|漏洞|錯誤|缺陷/i.test(issueType) || /^\s*\[\s*BUG/i.test(summary);
+    if (!key || seen.has(key) || !isBug) return [];
+    seen.add(key);
+    const group = trackingGroup(status, category);
+    return [{
+      key,
+      summary: summary || key,
+      url: `${siteUrl}/browse/${encodeURIComponent(key)}`,
+      status,
+      group,
+      regressionReady: group === "DEV 待測試" || group === "STG 待測試" || /待\s*測試/i.test(status)
+    }];
+  });
+}
+
 async function qaTesterFieldId(session, env) {
   const configured = String(env?.JIRA_QA_TESTER_FIELD_ID || "").trim();
   if (configured) return configured;
@@ -132,7 +172,7 @@ async function qaTesterFieldId(session, env) {
 
 export async function readProgressIssue(session, issueKey, env = {}) {
   const qaField = await qaTesterFieldId(session, env);
-  const requestedFields = ["summary", "status", qaField].filter(Boolean).join(",");
+  const requestedFields = ["summary", "status", "issuelinks", "subtasks", qaField].filter(Boolean).join(",");
   const response = await jiraFetch(
     session,
     `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${encodeURIComponent(requestedFields)}`
@@ -142,6 +182,7 @@ export async function readProgressIssue(session, issueKey, env = {}) {
   const issue = await response.json();
   const status = String(issue?.fields?.status?.name || "狀態未設定").trim();
   const statusCategory = String(issue?.fields?.status?.statusCategory?.key || "").trim();
+  const linkedBugs = relatedBugItems(issue?.fields, session.siteUrl);
   return {
     jiraKey: issueKey,
     jiraUrl: `${session.siteUrl}/browse/${encodeURIComponent(issueKey)}`,
@@ -149,6 +190,9 @@ export async function readProgressIssue(session, issueKey, env = {}) {
     jiraStatus: status,
     statusCategory,
     trackingGroup: trackingGroup(status, statusCategory),
+    linkedBugs,
+    linkedBugCount: linkedBugs.length,
+    regressionBugCount: linkedBugs.filter((bug) => bug.regressionReady).length,
     qaTesters: qaField ? jiraPeople(issue?.fields?.[qaField]) : ""
   };
 }
@@ -171,16 +215,20 @@ export async function syncProgressIssue(db, session, issueKey, now = new Date(),
 
   await db.prepare(`
     INSERT INTO progress_items (
-      jira_key, jira_url, summary, jira_status, status_category, tracking_group, qa_testers,
+      jira_key, jira_url, summary, jira_status, status_category, tracking_group,
+      linked_bugs_json, linked_bug_count, regression_bug_count, qa_testers,
       test_environment, environment_manual, submitted_date, release_date,
       dev_completed_date, stg_completed_date, prod_completed_date, note, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(jira_key) DO UPDATE SET
       jira_url = excluded.jira_url,
       summary = excluded.summary,
       jira_status = excluded.jira_status,
       status_category = excluded.status_category,
       tracking_group = excluded.tracking_group,
+      linked_bugs_json = excluded.linked_bugs_json,
+      linked_bug_count = excluded.linked_bug_count,
+      regression_bug_count = excluded.regression_bug_count,
       qa_testers = excluded.qa_testers,
       test_environment = excluded.test_environment,
       environment_manual = excluded.environment_manual,
@@ -198,6 +246,9 @@ export async function syncProgressIssue(db, session, issueKey, now = new Date(),
     jira.jiraStatus,
     jira.statusCategory,
     group,
+    JSON.stringify(jira.linkedBugs),
+    jira.linkedBugCount,
+    jira.regressionBugCount,
     jira.qaTesters,
     environment,
     environmentManual,
