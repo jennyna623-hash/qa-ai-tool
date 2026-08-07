@@ -1606,16 +1606,53 @@ function updateProgressStatusFilter() {
   if (statuses.includes(selected)) select.value = selected;
 }
 
+function progressQaTesters(item) {
+  return unique(String(item?.qa_testers || "")
+    .split(/[、,，;；\n]+/)
+    .map((tester) => tester.trim())
+    .filter(Boolean));
+}
+
+function updateProgressQaTesterFilter() {
+  const select = byId("progressQaTesterFilter");
+  const selected = select.value;
+  const testers = unique(progressItems.flatMap(progressQaTesters)).sort((a, b) => a.localeCompare(b, "zh-TW"));
+  const hasUnassigned = progressItems.some((item) => progressQaTesters(item).length === 0);
+  select.textContent = "";
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = "全部人員";
+  select.appendChild(all);
+  testers.forEach((tester) => {
+    const option = document.createElement("option");
+    option.value = tester;
+    option.textContent = tester;
+    select.appendChild(option);
+  });
+  if (hasUnassigned) {
+    const unassigned = document.createElement("option");
+    unassigned.value = "__unassigned__";
+    unassigned.textContent = "未指派";
+    select.appendChild(unassigned);
+  }
+  if (testers.includes(selected) || (selected === "__unassigned__" && hasUnassigned)) select.value = selected;
+}
+
 function filteredProgressItems() {
   const keyword = byId("progressSearch").value.trim().toLowerCase();
   const environment = byId("progressEnvironmentFilter").value;
   const status = byId("progressStatusFilter").value;
+  const qaTester = byId("progressQaTesterFilter").value;
   return progressItems.filter((item) => {
     const bugSearch = progressLinkedBugs(item).map((bug) => `${bug.key || ""} ${bug.summary || ""} ${bug.status || ""}`).join(" ");
     const searchable = `${item.jira_key || ""} ${item.summary || ""} ${bugSearch}`.toLowerCase();
+    const qaTesters = progressQaTesters(item);
+    const matchesQaTester = !qaTester
+      || (qaTester === "__unassigned__" ? qaTesters.length === 0 : qaTesters.includes(qaTester));
     return (!keyword || searchable.includes(keyword))
       && (!environment || item.test_environment === environment)
-      && (!status || item.jira_status === status);
+      && (!status || item.jira_status === status)
+      && matchesQaTester;
   });
 }
 
@@ -1676,6 +1713,7 @@ function progressCell(row, value, className = "") {
 
 function renderProgressTable() {
   updateProgressStatusFilter();
+  updateProgressQaTesterFilter();
   const body = byId("progressTableBody");
   const empty = byId("progressEmpty");
   const items = filteredProgressItems();
@@ -2036,6 +2074,7 @@ byId("progressSync").addEventListener("click", () => syncProgress(false));
 byId("progressSearch").addEventListener("input", renderProgressTable);
 byId("progressEnvironmentFilter").addEventListener("change", renderProgressTable);
 byId("progressStatusFilter").addEventListener("change", renderProgressTable);
+byId("progressQaTesterFilter").addEventListener("change", renderProgressTable);
 byId("settingsForm").addEventListener("submit", saveSettings);
 byId("healthCheck").addEventListener("click", checkHealth);
 

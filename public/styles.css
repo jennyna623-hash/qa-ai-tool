@@ -232,7 +232,7 @@ input[readonly], textarea[readonly] { background: #f8fafc; }
 
 .progress-add-card { margin-bottom: 18px; }
 .progress-output-head { margin-bottom: 16px; }
-.progress-filters { display: grid; grid-template-columns: minmax(240px, 1fr) 180px 220px; gap: 12px; margin-bottom: 16px; }
+.progress-filters { display: grid; grid-template-columns: minmax(240px, 1fr) 160px 200px 180px; gap: 12px; margin-bottom: 16px; }
 .progress-table-card { padding: 20px; }
 .progress-table-wrap { position: relative; max-width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
 .progress-table { width: 100%; min-width: 1840px; border-collapse: separate; border-spacing: 0; font-size: 12px; }
