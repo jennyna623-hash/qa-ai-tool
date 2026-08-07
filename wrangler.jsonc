@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "qa-ai-tool",
+  "compatibility_date": "2026-08-07",
+  "pages_build_output_dir": "./public",
+  "d1_databases": [
+    {
+      "binding": "PROGRESS_DB",
+      "database_name": "qa-ai-tool-progress",
+      "database_id": "16d1020b-4fe2-4330-9b44-6ec329579292"
+    }
+  ]
+}

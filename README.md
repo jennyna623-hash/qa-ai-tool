@@ -23,6 +23,9 @@
 - 需求單回報可一次輸入最多 20 筆 Jira 單號；多筆結果會彙整為編號需求清單，共用一組狀態與 CC，並支援 DEV／STG 完成與驗退文案、Telegram 帳號對照、編輯及富文字複製
 - 周進度可重新向 Jira 讀取既有項目的最新標題與狀態，自動重新分類及彙整；讀取失敗的項目會保留原資料
 - 周進度支援 DEV 待測試與 STG 待測試分類；Jira 狀態「DEV待測試／STG待測試」會自動歸入相對應分類
+- 共用進度追蹤以 Cloudflare D1 保存，所有同事查看同一份 Jira 進度表；新增時自動記錄提測日，開啟頁面後每 5 分鐘自動同步 Jira
+- 進度追蹤會自動讀取 Jira 的 QA測試人員、狀態及標題；首次到達各階段時記錄 DEV／STG／PROD 完成日，完成時自動填入當天上線日
+- 周進度選擇 Jenny、Ben 或 Guan 後，可依 QA測試人員自動合併本人共用進度；既有 Jira 輸入、手動新增與分類調整功能保留
 
 ## 尚待串接
 
@@ -38,6 +41,11 @@
 - Build output directory：`public`
 
 Cloudflare 會把專案根目錄的 `functions` 自動建立成 Pages Functions。
+
+多人共用進度另需在 Pages 專案的 Bindings 新增 D1 database：
+
+- Variable name：`PROGRESS_DB`
+- D1 database：`qa-ai-tool-progress`
 
 ## Jira OAuth 設定
 
@@ -60,6 +68,7 @@ Cloudflare 會把專案根目錄的 `functions` 自動建立成 Pages Functions�
 - `JIRA_PROJECT_KEY`：預設 `GSI`
 - `JIRA_ISSUE_TYPE_ID`：未設定時自動尋找「漏洞／Bug」類型
 - `JIRA_LINK_TYPE_NAME`：預設 `Blocks`，對應既有「is blocked by」主單關聯
+- `JIRA_QA_TESTER_FIELD_ID`：選填；未設定時會依 Jira 欄位名稱「QA測試人員」自動尋找
 
 ## 本機預覽
 

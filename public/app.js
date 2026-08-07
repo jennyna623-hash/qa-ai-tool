@@ -81,6 +81,10 @@ let jiraConnection = { configured: false, connected: false };
 let bugAttachments = [];
 let bugTelegramEditing = false;
 let requirementReportEditing = false;
+let progressItems = [];
+let progressLoaded = false;
+let progressSyncing = false;
+let progressSyncTimer = null;
 
 function loadState() {
   try {
@@ -518,6 +522,7 @@ function renderJiraConnection() {
   const connect = byId("jiraConnect");
   const disconnect = byId("jiraDisconnect");
   const weeklyConnect = byId("weeklyConnectJira");
+  const progressConnect = byId("progressConnectJira");
   card.classList.toggle("connected", jiraConnection.connected);
   card.classList.toggle("not-configured", !jiraConnection.configured);
   dot.classList.toggle("connected", jiraConnection.connected);
@@ -525,11 +530,14 @@ function renderJiraConnection() {
   disconnect.classList.toggle("hidden", !jiraConnection.connected);
   weeklyConnect.textContent = jiraConnection.connected ? "Jira 已連接" : "連接 Jira";
   weeklyConnect.disabled = jiraConnection.connected;
+  progressConnect.textContent = jiraConnection.connected ? "Jira 已連接" : "連接 Jira";
+  progressConnect.disabled = jiraConnection.connected;
 
   if (jiraConnection.connected) {
     title.textContent = "Jira 已連接";
     text.textContent = `${jiraConnection.displayName || "目前帳號"}｜${jiraConnection.projectKey || "GSI"}`;
     setWeeklySyncStatus(`Jira 已連接：${jiraConnection.displayName || "目前帳號"}。請輸入單號讀取資料。`, "ok");
+    if (!progressLoaded) setProgressStatus(`Jira 已連接：${jiraConnection.displayName || "目前帳號"}。進度資料可開始同步。`, "ok");
     connect.disabled = false;
     return;
   }
@@ -537,12 +545,14 @@ function renderJiraConnection() {
     title.textContent = "Jira 尚未完成設定";
     text.textContent = jiraConnection.message || "需要先設定 Atlassian OAuth";
     setWeeklySyncStatus(jiraConnection.message || "Jira 尚未完成設定。", "error");
+    setProgressStatus(jiraConnection.message || "Jira 尚未完成設定。", "error");
     connect.disabled = false;
     return;
   }
   title.textContent = "Jira 尚未連接";
   text.textContent = `連接 ${jiraConnection.siteUrl || "gamingsoft.atlassian.net"} 後可直接建單`;
   setWeeklySyncStatus("請先連接 Jira，再輸入 Jira 單號。", "error");
+  setProgressStatus("請先連接 Jira，再讀取共用進度。", "error");
   connect.disabled = false;
 }
 
@@ -1095,6 +1105,91 @@ function setWeeklySyncStatus(message, tone = "") {
   if (tone) status.classList.add(tone);
 }
 
+function normalizedPersonName(value) {
+  return String(value || "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function progressBelongsToReporter(item, reporter) {
+  const reporterKey = normalizedPersonName(reporter);
+  if (!reporterKey) return false;
+  return String(item.qa_testers || "")
+    .split(/[、,，;；/]+/)
+    .map(normalizedPersonName)
+    .filter(Boolean)
+    .some((name) => name === reporterKey || name.startsWith(reporterKey) || reporterKey.startsWith(name));
+}
+
+function progressIsRelevantToWeek(item) {
+  if (item.tracking_group !== "已完成") return true;
+  const dates = getWeekDates(byId("weeklyDate").value);
+  const start = dateKey(dates[0]);
+  const end = dateKey(dates[4]);
+  return [
+    item.submitted_date,
+    item.dev_completed_date,
+    item.stg_completed_date,
+    item.prod_completed_date,
+    item.release_date
+  ].some((value) => value && value >= start && value <= end);
+}
+
+async function importWeeklyProgress(automatic = false) {
+  if (!jiraConnection.connected) {
+    if (!automatic) {
+      setWeeklySyncStatus("請先連接 Jira，再從共用進度匯入。", "error");
+      if (jiraConnection.configured) connectJira();
+    }
+    return;
+  }
+  const reporter = byId("weeklyReporter").value;
+  const button = byId("weeklyImportProgress");
+  button.disabled = true;
+  button.textContent = "匯入中…";
+  setWeeklySyncStatus(`正在從共用進度整理 ${reporter} 的 Jira…`);
+  try {
+    const result = await progressApi("/api/progress");
+    progressItems = Array.isArray(result.items) ? result.items : [];
+    progressLoaded = true;
+    const matched = progressItems.filter((item) => progressBelongsToReporter(item, reporter) && progressIsRelevantToWeek(item));
+    const data = currentWeeklyData();
+    let added = 0;
+    let updated = 0;
+    matched.forEach((item) => {
+      const existing = data.items.find((candidate) => candidate.type === "jira" && candidate.key === item.jira_key);
+      if (existing) {
+        existing.url = item.jira_url;
+        existing.summary = item.summary;
+        existing.status = item.jira_status;
+        updated += 1;
+        return;
+      }
+      data.items.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        type: "jira",
+        key: item.jira_key,
+        url: item.jira_url,
+        summary: item.summary,
+        status: item.jira_status,
+        group: WEEKLY_GROUPS.includes(item.tracking_group) ? item.tracking_group : "其他／待處理"
+      });
+      added += 1;
+    });
+    saveWeeklyForm();
+    renderWeeklyBoard();
+    generateWeeklyOutput();
+    if (!matched.length) {
+      setWeeklySyncStatus(`共用進度目前沒有 QA測試人員為 ${reporter} 的本周項目；仍可使用原本方式加入。`, "error");
+    } else {
+      setWeeklySyncStatus(`已從共用進度合併 ${matched.length} 筆：新增 ${added} 筆、更新 ${updated} 筆；原有手動內容已保留。`, "ok");
+    }
+  } catch (error) {
+    setWeeklySyncStatus(error instanceof Error ? error.message : "共用進度匯入失敗", "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "從進度追蹤匯入";
+  }
+}
+
 async function addWeeklySources() {
   const sources = extractSources(byId("weeklySources").value);
   if (!sources.length) {
@@ -1473,6 +1568,293 @@ function saveSettings(event) {
   showToast("同事設定已儲存");
 }
 
+function setProgressStatus(message, tone = "") {
+  const status = byId("progressStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.remove("ok", "error");
+  if (tone) status.classList.add(tone);
+}
+
+function progressDate(value) {
+  return String(value || "").trim() || "—";
+}
+
+function progressTimeLabel() {
+  return new Intl.DateTimeFormat("zh-TW", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(new Date());
+}
+
+function updateProgressStatusFilter() {
+  const select = byId("progressStatusFilter");
+  const selected = select.value;
+  const statuses = unique(progressItems.map((item) => String(item.jira_status || "").trim()).filter(Boolean)).sort();
+  select.textContent = "";
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = "全部狀態";
+  select.appendChild(all);
+  statuses.forEach((status) => {
+    const option = document.createElement("option");
+    option.value = status;
+    option.textContent = status;
+    select.appendChild(option);
+  });
+  if (statuses.includes(selected)) select.value = selected;
+}
+
+function filteredProgressItems() {
+  const keyword = byId("progressSearch").value.trim().toLowerCase();
+  const environment = byId("progressEnvironmentFilter").value;
+  const status = byId("progressStatusFilter").value;
+  return progressItems.filter((item) => {
+    const searchable = `${item.jira_key || ""} ${item.summary || ""}`.toLowerCase();
+    return (!keyword || searchable.includes(keyword))
+      && (!environment || item.test_environment === environment)
+      && (!status || item.jira_status === status);
+  });
+}
+
+function progressCell(row, value, className = "") {
+  const cell = document.createElement("td");
+  if (className) cell.className = className;
+  cell.textContent = value;
+  row.appendChild(cell);
+  return cell;
+}
+
+function renderProgressTable() {
+  updateProgressStatusFilter();
+  const body = byId("progressTableBody");
+  const empty = byId("progressEmpty");
+  const items = filteredProgressItems();
+  body.textContent = "";
+  empty.classList.toggle("hidden", items.length > 0);
+  if (!items.length) {
+    empty.textContent = progressItems.length
+      ? "目前篩選條件沒有符合的項目。"
+      : "尚無追蹤項目，請先加入 Jira 單。";
+    return;
+  }
+
+  items.forEach((item) => {
+    const row = document.createElement("tr");
+    const issueCell = document.createElement("td");
+    const issue = document.createElement("div");
+    issue.className = "progress-issue";
+    const link = document.createElement("a");
+    link.href = item.jira_url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = item.jira_key;
+    const summary = document.createElement("span");
+    summary.textContent = item.summary;
+    issue.append(link, summary);
+    issueCell.appendChild(issue);
+    row.appendChild(issueCell);
+
+    progressCell(row, progressDate(item.submitted_date), "progress-date");
+    progressCell(row, progressDate(item.release_date), "progress-date");
+    const statusCell = document.createElement("td");
+    const status = document.createElement("span");
+    status.className = "progress-status-pill";
+    status.dataset.group = item.tracking_group || "其他／待處理";
+    status.textContent = item.jira_status || "狀態未設定";
+    status.title = `自動分類：${item.tracking_group || "其他／待處理"}`;
+    statusCell.appendChild(status);
+    row.appendChild(statusCell);
+
+    progressCell(row, String(item.qa_testers || "").trim() || "未指派", "progress-qa");
+
+    const environmentCell = document.createElement("td");
+    const environment = document.createElement("select");
+    ["DEV", "STG", "PROD"].forEach((value) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value;
+      environment.appendChild(option);
+    });
+    environment.value = item.test_environment || "DEV";
+    environment.addEventListener("change", () => updateProgressItem(item, environment, note));
+    environmentCell.appendChild(environment);
+    row.appendChild(environmentCell);
+
+    const noteCell = document.createElement("td");
+    const note = document.createElement("input");
+    note.className = "progress-note";
+    note.type = "text";
+    note.maxLength = 1000;
+    note.placeholder = "補充說明";
+    note.value = item.note || "";
+    note.addEventListener("change", () => updateProgressItem(item, environment, note));
+    noteCell.appendChild(note);
+    row.appendChild(noteCell);
+
+    progressCell(row, progressDate(item.dev_completed_date), "progress-date");
+    progressCell(row, progressDate(item.stg_completed_date), "progress-date");
+    progressCell(row, progressDate(item.prod_completed_date), "progress-date");
+    const actionCell = document.createElement("td");
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "progress-remove";
+    remove.textContent = "移除";
+    remove.addEventListener("click", () => removeProgressItem(item));
+    actionCell.appendChild(remove);
+    row.appendChild(actionCell);
+    body.appendChild(row);
+  });
+}
+
+async function progressApi(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {})
+    },
+    cache: "no-store"
+  });
+  const data = await response.json().catch(() => ({ ok: false, message: `雲端回應錯誤（HTTP ${response.status}）` }));
+  if (response.status === 401) {
+    jiraConnection.connected = false;
+    renderJiraConnection();
+  }
+  if (!response.ok || !data.ok) throw new Error(data.message || "共用進度操作失敗");
+  return data;
+}
+
+async function loadProgressItems() {
+  if (!jiraConnection.connected) {
+    setProgressStatus("請先連接 Jira，才能查看團隊共用進度。", "error");
+    return;
+  }
+  setProgressStatus("正在讀取團隊共用進度…");
+  try {
+    const data = await progressApi("/api/progress");
+    progressItems = Array.isArray(data.items) ? data.items : [];
+    progressLoaded = true;
+    renderProgressTable();
+    setProgressStatus(`已載入 ${progressItems.length} 筆共用進度，接著自動比對 Jira 最新狀態。`, "ok");
+    byId("progressLastSync").textContent = `讀取 ${progressTimeLabel()}`;
+  } catch (error) {
+    setProgressStatus(error instanceof Error ? error.message : "共用進度讀取失敗", "error");
+  }
+}
+
+async function addProgressSources() {
+  const sources = extractSources(byId("progressSources").value);
+  if (!sources.length) {
+    showToast("請輸入 Jira 單號");
+    return;
+  }
+  if (!jiraConnection.connected) {
+    setProgressStatus("請先連接 Jira，完成後再加入追蹤。", "error");
+    if (jiraConnection.configured) connectJira();
+    return;
+  }
+  const button = byId("progressAdd");
+  button.disabled = true;
+  button.textContent = "加入中…";
+  setProgressStatus(`正在讀取並加入 ${sources.length} 筆 Jira 單…`);
+  try {
+    const data = await progressApi("/api/progress", {
+      method: "POST",
+      body: JSON.stringify({ issues: sources.map((source) => source.key) })
+    });
+    byId("progressSources").value = "";
+    await loadProgressItems();
+    const failed = Array.isArray(data.errors) ? data.errors.length : 0;
+    setProgressStatus(`已加入或更新 ${data.count} 筆，提測日依首次加入日期自動填寫${failed ? `；另有 ${failed} 筆失敗` : ""}。`, failed ? "error" : "ok");
+    showToast(`已加入 ${data.count} 筆 Jira 追蹤`);
+  } catch (error) {
+    setProgressStatus(error instanceof Error ? error.message : "加入追蹤失敗", "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "加入追蹤";
+  }
+}
+
+async function syncProgress(quiet = false) {
+  if (progressSyncing || !jiraConnection.connected) return;
+  progressSyncing = true;
+  const button = byId("progressSync");
+  button.disabled = true;
+  button.textContent = "同步中…";
+  if (!quiet) setProgressStatus("正在逐筆比對 Jira 最新狀態與完成日期…");
+  try {
+    const data = await progressApi("/api/progress/sync", { method: "POST", body: "{}" });
+    progressItems = Array.isArray(data.items) ? data.items : [];
+    progressLoaded = true;
+    renderProgressTable();
+    const failed = Array.isArray(data.errors) ? data.errors.length : 0;
+    setProgressStatus(`已同步 ${data.synced} 筆 Jira；下次會在 5 分鐘後自動檢查${failed ? `，${failed} 筆失敗` : ""}。`, failed ? "error" : "ok");
+    byId("progressLastSync").textContent = `同步 ${progressTimeLabel()}`;
+    byId("progressLastSync").classList.add("ready");
+  } catch (error) {
+    setProgressStatus(error instanceof Error ? error.message : "Jira 同步失敗", "error");
+  } finally {
+    progressSyncing = false;
+    button.disabled = false;
+    button.textContent = "立即同步 Jira";
+  }
+}
+
+async function updateProgressItem(item, environment, note) {
+  environment.disabled = true;
+  note.disabled = true;
+  try {
+    const data = await progressApi("/api/progress/update", {
+      method: "POST",
+      body: JSON.stringify({ id: item.id, testEnvironment: environment.value, note: note.value })
+    });
+    Object.assign(item, data.item);
+    setProgressStatus(`${item.jira_key} 已儲存，其他同事重新開啟後即可看到。`, "ok");
+  } catch (error) {
+    setProgressStatus(error instanceof Error ? error.message : "進度儲存失敗", "error");
+    renderProgressTable();
+  } finally {
+    environment.disabled = false;
+    note.disabled = false;
+  }
+}
+
+async function removeProgressItem(item) {
+  if (!window.confirm(`確定要從共用進度移除 ${item.jira_key}？`)) return;
+  try {
+    await progressApi("/api/progress/delete", {
+      method: "POST",
+      body: JSON.stringify({ id: item.id })
+    });
+    progressItems = progressItems.filter((candidate) => candidate.id !== item.id);
+    renderProgressTable();
+    setProgressStatus(`${item.jira_key} 已從共用進度移除。`, "ok");
+  } catch (error) {
+    setProgressStatus(error instanceof Error ? error.message : "移除失敗", "error");
+  }
+}
+
+async function activateProgressView() {
+  if (!progressLoaded) {
+    await loadProgressItems();
+    if (jiraConnection.connected) await syncProgress(true);
+  }
+  clearInterval(progressSyncTimer);
+  progressSyncTimer = window.setInterval(() => {
+    if (byId("view-progress").classList.contains("active") && document.visibilityState === "visible") {
+      syncProgress(true);
+    }
+  }, 5 * 60 * 1000);
+}
+
+function deactivateProgressView() {
+  clearInterval(progressSyncTimer);
+  progressSyncTimer = null;
+}
+
 async function checkHealth() {
   const result = byId("healthResult");
   result.textContent = "檢查中...";
@@ -1493,6 +1875,8 @@ document.querySelectorAll(".nav-item").forEach((button) => {
     const view = byId(`view-${button.dataset.view}`);
     view.classList.add("active");
     byId("pageTitle").textContent = view.dataset.title;
+    if (button.dataset.view === "progress") activateProgressView();
+    else deactivateProgressView();
     window.scrollTo(0, 0);
   });
 });
@@ -1586,13 +1970,23 @@ byId("requirementReportEdit").addEventListener("click", () => setRequirementRepo
 byId("requirementReportCopy").addEventListener("click", copyRequirementReport);
 byId("weeklyConnectJira").addEventListener("click", connectJira);
 byId("weeklyAdd").addEventListener("click", addWeeklySources);
+byId("weeklyImportProgress").addEventListener("click", () => importWeeklyProgress(false));
 byId("weeklyManualAdd").addEventListener("click", addWeeklyManualItem);
 byId("weeklyClear").addEventListener("click", clearWeekly);
 byId("weeklyGenerate").addEventListener("click", refreshWeeklyOutput);
 byId("weeklyCopy").addEventListener("click", copyWeeklyOutput);
 byId("weeklyDate").addEventListener("change", loadWeekly);
-byId("weeklyReporter").addEventListener("change", saveWeeklyForm);
+byId("weeklyReporter").addEventListener("change", () => {
+  saveWeeklyForm();
+  importWeeklyProgress(true);
+});
 byId("weeklyOutput").addEventListener("input", saveWeeklyForm);
+byId("progressConnectJira").addEventListener("click", connectJira);
+byId("progressAdd").addEventListener("click", addProgressSources);
+byId("progressSync").addEventListener("click", () => syncProgress(false));
+byId("progressSearch").addEventListener("input", renderProgressTable);
+byId("progressEnvironmentFilter").addEventListener("change", renderProgressTable);
+byId("progressStatusFilter").addEventListener("change", renderProgressTable);
 byId("settingsForm").addEventListener("submit", saveSettings);
 byId("healthCheck").addEventListener("click", checkHealth);
 

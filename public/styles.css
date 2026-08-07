@@ -230,6 +230,32 @@ input[readonly], textarea[readonly] { background: #f8fafc; }
 .weekly-item input, .weekly-item select { height: 36px; margin-top: 7px; font-size: 12px; }
 .weekly-item label { display: block; color: var(--muted); font-size: 11px; }
 
+.progress-add-card { margin-bottom: 18px; }
+.progress-output-head { margin-bottom: 16px; }
+.progress-filters { display: grid; grid-template-columns: minmax(240px, 1fr) 180px 220px; gap: 12px; margin-bottom: 16px; }
+.progress-table-card { padding: 20px; }
+.progress-table-wrap { position: relative; max-width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.progress-table { width: 100%; min-width: 1600px; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.progress-table th, .progress-table td { padding: 11px 10px; border-bottom: 1px solid #eaecf0; vertical-align: middle; text-align: left; }
+.progress-table th { position: sticky; top: 0; z-index: 2; color: #344054; background: #eaf2ff; font-weight: 850; white-space: nowrap; }
+.progress-table tbody tr:last-child td { border-bottom: 0; }
+.progress-table tbody tr:hover td { background: #fbfdff; }
+.progress-issue { display: grid; min-width: 300px; gap: 4px; }
+.progress-issue a { width: fit-content; color: var(--primary); font-weight: 850; text-decoration: none; }
+.progress-issue a:hover { text-decoration: underline; }
+.progress-issue span { color: #344054; line-height: 1.45; }
+.progress-date { min-width: 88px; color: #475467; white-space: nowrap; }
+.progress-status-pill { display: inline-flex; align-items: center; min-width: max-content; padding: 6px 9px; border-radius: 999px; color: #175cd3; background: #eff8ff; font-weight: 800; white-space: nowrap; }
+.progress-status-pill[data-group="待修正"] { color: var(--danger); background: var(--danger-soft); }
+.progress-status-pill[data-group="待進版STG"], .progress-status-pill[data-group="待進版 PROD"] { color: var(--warning); background: var(--warning-soft); }
+.progress-status-pill[data-group="已完成"] { color: var(--success); background: var(--success-soft); }
+.progress-qa { min-width: 130px; color: #344054; line-height: 1.45; }
+.progress-table select { width: 92px; height: 36px; padding: 0 9px; font-size: 12px; }
+.progress-note { width: 210px; height: 36px; padding: 0 9px; font-size: 12px; }
+.progress-remove { min-height: 32px; padding: 0 10px; border: 0; border-radius: 8px; color: var(--danger); background: var(--danger-soft); font-size: 12px; font-weight: 750; }
+.progress-empty { padding: 46px 20px; color: #98a2b3; text-align: center; }
+.progress-help { margin: 13px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .settings-grid .warning-card { grid-column: 1 / -1; }
 .people-list { display: flex; flex-wrap: wrap; gap: 9px; }
@@ -273,7 +299,7 @@ input[readonly], textarea[readonly] { background: #f8fafc; }
   .content { padding: 24px 15px 54px; }
   .topbar, .page-intro { align-items: flex-start; }
   .cloud-badge { display: none; }
-  .form-grid, .weekly-top-grid, .settings-grid { grid-template-columns: 1fr; }
+  .form-grid, .weekly-top-grid, .settings-grid, .progress-filters { grid-template-columns: 1fr; }
   .field.full, .settings-grid .warning-card { grid-column: auto; }
   .weekly-board, .status-grid { grid-template-columns: 1fr; }
   .card { padding: 18px; border-radius: 14px; }
