@@ -41,6 +41,7 @@ const SITES = [
   { url: "https://agent-d334-dev.gsiwl.com", env: "DEV", code: "set33_GREEN｜R007" },
   { url: "https://agent-skd1-dev.gsiwl.com", env: "DEV", code: "set33_RED｜R008" },
   { url: "https://agent-djpn-dev.gsiwl.com", env: "DEV", code: "set_amuse｜R013" },
+  { url: "https://agent-gsi2.gsiwl.com", env: "STG", code: "新架構" },
   { url: "https://agent-s334.gsiwl.com", env: "STG", code: "set33_GREEN｜R007" },
   { url: "https://agent-33rd.gsiwl.com", env: "STG", code: "set33_RED｜R008" },
   { url: "https://agent-sjpn.gsiwl.com", env: "STG", code: "set_amuse｜R013" },
@@ -52,7 +53,6 @@ const SITES = [
   { url: "https://agent-gsi3.gsiwl.com", env: "STG", code: "okbet｜R001" },
   { url: "https://agent-r171.gsiwl.com", env: "STG", code: "set_r017｜R017" },
   { url: "https://agent-r017.gsiwl.com", env: "STG", code: "set_r017｜R017" },
-  { url: "https://agent-gsi2.gsiwl.com", env: "STG", code: "set_r017｜R017" },
   { url: "https://agent-obrd.gsiwl.com", env: "STG", code: "okbet_red｜R018" },
   { url: "https://agent-ed3d.gsiwl.com", env: "STG", code: "set_ed3｜R019" },
   { url: "https://agent-r021.gsiwl.com", env: "STG", code: "set_r021｜R021" },
@@ -146,7 +146,7 @@ function deriveMemberUrl(agentUrl) {
 function refreshBugSites(preferredSite) {
   const env = byId("bugEnv").value;
   const codes = unique(SITES.filter((site) => site.env === env).map((site) => site.code));
-  const fallback = env === "STG" && codes.includes("set_r017｜R017") ? "set_r017｜R017" : codes[0];
+  const fallback = env === "STG" && codes.includes("新架構") ? "新架構" : codes[0];
   fillSelect(byId("bugSite"), codes, preferredSite || byId("bugSite").value || fallback);
   refreshBugUrls();
 }
@@ -167,14 +167,8 @@ function refreshBugUrls(preferredUrl) {
   byId("bugMemberUrl").value = deriveMemberUrl(select.value);
 }
 
-function getTitleSiteLabel(siteCode, memberUrl) {
-  const code = siteCode.includes("｜") ? siteCode.split("｜").pop().trim() : siteCode.trim();
-  if (code !== "R017") return code;
-  try {
-    return new URL(memberUrl).hostname.toLowerCase() === "gsi2.gsiwl.com" ? "新架構" : code;
-  } catch {
-    return code;
-  }
+function getTitleSiteLabel(siteCode) {
+  return siteCode.includes("｜") ? siteCode.split("｜").pop().trim() : siteCode.trim();
 }
 
 function normalizeIssueNumber(value) {
@@ -483,9 +477,8 @@ function buildBugDescription(useImageMarkers = false) {
 function buildBugOutput({ silent = false } = {}) {
   const env = byId("bugEnv").value;
   const site = byId("bugSite").value;
-  const memberUrl = byId("bugMemberUrl").value;
   const seed = byId("bugTitleSeed").value.trim();
-  const title = `[BUG][${env}][${getTitleSiteLabel(site, memberUrl)}]${seed}`;
+  const title = `[BUG][${env}][${getTitleSiteLabel(site)}]${seed}`;
   const content = buildBugDescription();
   byId("bugOutputTitle").value = title;
   byId("bugOutputContent").value = content;
@@ -2116,7 +2109,7 @@ consumeJiraRedirectResult();
 byId("jiraBaseUrl").value = state.jiraBaseUrl;
 byId("requirementReportIssue").value = state.requirementIssue;
 byId("requirementReportStage").value = state.requirementStage;
-refreshBugSites("set_r017｜R017");
+refreshBugSites("新架構");
 refreshBugUrls("https://agent-gsi2.gsiwl.com");
 fillSelect(byId("weeklyManualGroup"), WEEKLY_GROUPS, "其他／待處理");
 byId("weeklyDate").value = dateKey(new Date());
