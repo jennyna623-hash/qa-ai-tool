@@ -339,7 +339,10 @@
         <article class="card progress-table-card">
           <div class="output-head progress-output-head">
             <div><span>SHARED TRACKER</span><h3>共用進度表</h3></div>
-            <span id="progressLastSync" class="mini-state">尚未同步</span>
+            <div class="progress-head-actions">
+              <span id="progressLastSync" class="mini-state">尚未同步</span>
+              <button class="button soft" type="button" id="progressReportToggle">產生測試報告</button>
+            </div>
           </div>
           <div class="progress-filters">
             <label class="field"><span>搜尋</span><input id="progressSearch" type="search" placeholder="Jira 單號或標題"></label>
@@ -347,6 +350,28 @@
             <label class="field"><span>狀態</span><select id="progressStatusFilter"><option value="">全部狀態</option></select></label>
             <label class="field"><span>QA測試人員</span><select id="progressQaTesterFilter"><option value="">全部人員</option></select></label>
           </div>
+          <section class="progress-report-builder hidden" id="progressReportBuilder" aria-label="測試報告產生器">
+            <div class="section-heading">
+              <span>R</span>
+              <div><h3>每週測試報告</h3><p>沿用目前表格的搜尋、環境、狀態及 QA 篩選結果產生報告。</p></div>
+            </div>
+            <div class="progress-report-form">
+              <label class="field report-title-field"><span>報告名稱</span><input id="progressReportTitle" type="text" value="每週測試報告" maxlength="80"></label>
+              <label class="field"><span>開始日期</span><input id="progressReportStart" type="date"></label>
+              <label class="field"><span>結束日期</span><input id="progressReportEnd" type="date"></label>
+              <label class="field"><span>測試結論</span><select id="progressReportConclusion"><option>待評估</option><option>建議上線</option><option>附條件上線</option><option>暫緩上線</option></select></label>
+              <label class="field report-wide"><span>風險與阻塞</span><textarea id="progressReportRisk" rows="2" placeholder="例如：GSI-123 尚待修正，可能影響本週上線。"></textarea></label>
+              <label class="field report-wide"><span>備註</span><textarea id="progressReportNotes" rows="2" placeholder="補充測試範圍、未測項目或其他注意事項。"></textarea></label>
+            </div>
+            <p class="progress-report-help">日期用於標示報告期間；報告會保留目前篩選出的跨週進行中項目。</p>
+            <div class="actions progress-report-actions">
+              <button class="button primary" type="button" id="progressReportGenerate">更新預覽</button>
+              <button class="button soft" type="button" id="progressReportExcel" disabled>下載 Excel</button>
+              <button class="button ghost" type="button" id="progressReportPdf" disabled>列印／儲存 PDF</button>
+            </div>
+            <div class="report-status" id="progressReportStatus" aria-live="polite">請確認期間與目前篩選條件後產生預覽。</div>
+            <div class="test-report-preview hidden" id="progressReportPreview"></div>
+          </section>
           <div class="progress-table-wrap">
             <table class="progress-table">
               <thead>
@@ -418,6 +443,7 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js?v=20260807-progress5" defer></script>
+  <script src="./report-export.js?v=20260814-test-report1" defer></script>
+  <script src="./app.js?v=20260814-test-report1" defer></script>
 </body>
 </html>

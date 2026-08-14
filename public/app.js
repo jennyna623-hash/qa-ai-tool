@@ -87,6 +87,7 @@ let progressItems = [];
 let progressLoaded = false;
 let progressSyncing = false;
 let progressSyncTimer = null;
+let progressReport = null;
 
 function loadState() {
   try {
@@ -1661,6 +1662,285 @@ function progressLinkedBugs(item) {
   }
 }
 
+function progressReportFilterLabel() {
+  const labels = [];
+  const keyword = byId("progressSearch").value.trim();
+  const environment = byId("progressEnvironmentFilter").value;
+  const status = byId("progressStatusFilter").value;
+  const qaTester = byId("progressQaTesterFilter").value;
+  if (keyword) labels.push(`搜尋：${keyword}`);
+  if (environment) labels.push(`環境：${environment}`);
+  if (status) labels.push(`狀態：${status}`);
+  if (qaTester) labels.push(`QA：${qaTester === "__unassigned__" ? "未指派" : qaTester}`);
+  return labels.length ? labels.join("｜") : "全部共用進度";
+}
+
+function progressReportEntry(item) {
+  const bugs = progressLinkedBugs(item);
+  const ready = bugs.filter((bug) => Boolean(bug.regressionReady));
+  return {
+    key: String(item.jira_key || "").trim(),
+    summary: String(item.summary || "").trim(),
+    url: String(item.jira_url || "").trim(),
+    status: String(item.jira_status || "狀態未設定").trim(),
+    group: String(item.tracking_group || "其他／待處理").trim(),
+    qaTesters: String(item.qa_testers || "").trim() || "未指派",
+    environment: String(item.test_environment || "").trim() || "未設定",
+    submittedDate: progressDate(item.submitted_date),
+    releaseDate: progressDate(item.release_date),
+    devCompletedDate: progressDate(item.dev_completed_date),
+    stgCompletedDate: progressDate(item.stg_completed_date),
+    prodCompletedDate: progressDate(item.prod_completed_date),
+    defectCount: bugs.length,
+    regressionReadyCount: ready.length,
+    defects: bugs.map((bug) => `${bug.key || "BUG"}｜${bug.status || "狀態未設定"}`).join("；") || "—",
+    note: String(item.note || "").trim() || "—"
+  };
+}
+
+function progressReportDistribution(items, property, preferredOrder = []) {
+  const counts = new Map();
+  items.forEach((item) => counts.set(item[property], (counts.get(item[property]) || 0) + 1));
+  const known = preferredOrder.filter((label) => counts.has(label));
+  const other = [...counts.keys()].filter((label) => !preferredOrder.includes(label)).sort((a, b) => a.localeCompare(b, "zh-TW"));
+  return [...known, ...other].map((label) => ({ label, count: counts.get(label) }));
+}
+
+function buildProgressReport() {
+  const start = byId("progressReportStart").value;
+  const end = byId("progressReportEnd").value;
+  if (!start || !end) throw new Error("請選擇報告開始與結束日期");
+  if (start > end) throw new Error("報告開始日期不可晚於結束日期");
+  const sourceItems = filteredProgressItems();
+  if (!sourceItems.length) throw new Error("目前篩選結果沒有可產生報告的項目");
+  const items = sourceItems.map(progressReportEntry).sort((a, b) => a.key.localeCompare(b.key, "zh-TW", { numeric: true }));
+  const completed = items.filter((item) => item.group === "已完成").length;
+  const testing = items.filter((item) => /測試中|待測試/.test(item.group)).length;
+  const pendingFix = items.filter((item) => item.group === "待修正").length;
+  const waitingDeploy = items.filter((item) => /待進版/.test(item.group)).length;
+  const defects = items.reduce((sum, item) => sum + item.defectCount, 0);
+  const regressionReady = items.reduce((sum, item) => sum + item.regressionReadyCount, 0);
+  return {
+    title: byId("progressReportTitle").value.trim() || "每週測試報告",
+    start,
+    end,
+    period: `${start}－${end}`,
+    generatedAt: new Intl.DateTimeFormat("zh-TW", { dateStyle: "medium", timeStyle: "medium" }).format(new Date()),
+    filterLabel: progressReportFilterLabel(),
+    conclusion: byId("progressReportConclusion").value,
+    risk: byId("progressReportRisk").value.trim(),
+    notes: byId("progressReportNotes").value.trim(),
+    metrics: {
+      total: items.length,
+      completed,
+      testing,
+      pendingFix,
+      waitingDeploy,
+      defects,
+      regressionReady,
+      completionRate: items.length ? Math.round((completed / items.length) * 100) : 0
+    },
+    environments: progressReportDistribution(items, "environment", ["DEV", "STG", "PROD", "未設定"]),
+    groups: progressReportDistribution(items, "group", WEEKLY_GROUPS),
+    items
+  };
+}
+
+function reportElement(tag, className = "", text = "") {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== "") element.textContent = text;
+  return element;
+}
+
+function reportSafeUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : "#";
+  } catch {
+    return "#";
+  }
+}
+
+function renderProgressReport(report) {
+  const preview = byId("progressReportPreview");
+  preview.textContent = "";
+  preview.classList.remove("hidden");
+
+  const header = reportElement("div", "test-report-header");
+  const heading = reportElement("div");
+  heading.append(reportElement("h3", "", report.title));
+  heading.append(reportElement("p", "", `報告期間：${report.period}｜產生時間：${report.generatedAt}`));
+  heading.append(reportElement("p", "", `資料範圍：${report.filterLabel}`));
+  header.append(heading, reportElement("span", "test-report-conclusion", report.conclusion));
+  preview.appendChild(header);
+
+  const metrics = reportElement("div", "test-report-metrics");
+  [
+    ["追蹤需求", report.metrics.total],
+    ["完成率", `${report.metrics.completionRate}%`],
+    ["已完成", report.metrics.completed],
+    ["測試中／待測試", report.metrics.testing],
+    ["待修正", report.metrics.pendingFix],
+    ["待進版", report.metrics.waitingDeploy],
+    ["關聯 BUG", report.metrics.defects],
+    ["可回歸 BUG", report.metrics.regressionReady]
+  ].forEach(([label, value]) => {
+    const card = reportElement("div", "test-report-metric");
+    card.append(reportElement("span", "", label), reportElement("strong", "", String(value)));
+    metrics.appendChild(card);
+  });
+  preview.appendChild(metrics);
+
+  const distribution = reportElement("section", "test-report-section");
+  distribution.append(reportElement("h4", "", "環境與進度分布"));
+  const chips = reportElement("div", "test-report-distribution");
+  [...report.environments, ...report.groups].forEach((entry) => chips.append(reportElement("span", "test-report-chip", `${entry.label} ${entry.count}`)));
+  distribution.appendChild(chips);
+  preview.appendChild(distribution);
+
+  [["風險與阻塞", report.risk || "目前未填寫風險與阻塞。"], ["備註", report.notes || "目前未填寫補充備註。"]].forEach(([title, value]) => {
+    const section = reportElement("section", "test-report-section");
+    section.append(reportElement("h4", "", title), reportElement("p", "test-report-note", value));
+    preview.appendChild(section);
+  });
+
+  const details = reportElement("section", "test-report-section");
+  details.append(reportElement("h4", "", `測試明細（${report.items.length} 筆）`));
+  const wrap = reportElement("div", "test-report-table-wrap");
+  const table = reportElement("table", "test-report-table");
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  ["需求單", "標題", "狀態", "分類", "QA", "環境", "提測日", "關聯 BUG", "備註"].forEach((label) => headerRow.append(reportElement("th", "", label)));
+  thead.appendChild(headerRow);
+  const tbody = document.createElement("tbody");
+  report.items.forEach((item) => {
+    const row = document.createElement("tr");
+    const issueCell = document.createElement("td");
+    const issueLink = reportElement("a", "", item.key);
+    issueLink.href = reportSafeUrl(item.url);
+    issueLink.target = "_blank";
+    issueLink.rel = "noopener";
+    issueCell.appendChild(issueLink);
+    [issueCell, reportElement("td", "", item.summary), reportElement("td", "", item.status), reportElement("td", "", item.group),
+      reportElement("td", "", item.qaTesters), reportElement("td", "", item.environment), reportElement("td", "", item.submittedDate),
+      reportElement("td", "", `${item.defectCount}（可回歸 ${item.regressionReadyCount}）`), reportElement("td", "", item.note)]
+      .forEach((cell) => row.appendChild(cell));
+    tbody.appendChild(row);
+  });
+  table.append(thead, tbody);
+  wrap.appendChild(table);
+  details.appendChild(wrap);
+  preview.appendChild(details);
+}
+
+function sanitizedDownloadName(value) {
+  return String(value || "測試報告").trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "_").slice(0, 80) || "測試報告";
+}
+
+function downloadProgressReportExcel() {
+  if (!progressReport || !window.ProgressReportExport) {
+    showToast("請先產生測試報告預覽");
+    return;
+  }
+  const bytes = window.ProgressReportExport.createWorkbook(progressReport);
+  const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${sanitizedDownloadName(progressReport.title)}_${progressReport.start}_${progressReport.end}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  showToast("Excel 測試報告已下載");
+}
+
+function reportHtmlEscape(value) {
+  const node = document.createElement("div");
+  node.textContent = String(value ?? "");
+  return node.innerHTML;
+}
+
+function progressReportPrintHtml(report) {
+  const metricCards = [
+    ["追蹤需求", report.metrics.total], ["完成率", `${report.metrics.completionRate}%`], ["已完成", report.metrics.completed],
+    ["測試中／待測試", report.metrics.testing], ["待修正", report.metrics.pendingFix], ["待進版", report.metrics.waitingDeploy],
+    ["關聯 BUG", report.metrics.defects], ["可回歸 BUG", report.metrics.regressionReady]
+  ].map(([label, value]) => `<div class="metric"><span>${reportHtmlEscape(label)}</span><strong>${reportHtmlEscape(value)}</strong></div>`).join("");
+  const distributions = [...report.environments, ...report.groups]
+    .map((entry) => `<span class="chip">${reportHtmlEscape(entry.label)} ${entry.count}</span>`).join("");
+  const rows = report.items.map((item) => `<tr>
+    <td><a href="${reportHtmlEscape(reportSafeUrl(item.url))}">${reportHtmlEscape(item.key)}</a></td><td>${reportHtmlEscape(item.summary)}</td>
+    <td>${reportHtmlEscape(item.status)}</td><td>${reportHtmlEscape(item.group)}</td><td>${reportHtmlEscape(item.qaTesters)}</td>
+    <td>${reportHtmlEscape(item.environment)}</td><td>${reportHtmlEscape(item.submittedDate)}</td>
+    <td>${item.defectCount}（可回歸 ${item.regressionReadyCount}）</td><td>${reportHtmlEscape(item.note)}</td>
+  </tr>`).join("");
+  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${reportHtmlEscape(report.title)}</title><style>
+    @page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{margin:0;color:#172033;font-family:"Microsoft JhengHei",sans-serif;font-size:10px}h1{margin:0 0 6px;font-size:24px}.meta{color:#667085;line-height:1.6}.conclusion{float:right;padding:7px 10px;border-radius:8px;color:#1849a9;background:#eff4ff;font-weight:700}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0}.metric{padding:10px;border:1px solid #e3e8f0;border-radius:8px}.metric span{display:block;color:#667085}.metric strong{display:block;margin-top:5px;color:#1849a9;font-size:18px}.section{margin-top:16px}.section h2{margin:0 0 7px;font-size:13px}.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{padding:6px 8px;border-radius:6px;background:#f2f4f7;font-weight:700}.note{min-height:36px;margin:0;padding:9px;border-left:3px solid #84adff;background:#f8faff;white-space:pre-wrap}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{padding:6px;border:1px solid #dfe5ee;vertical-align:top;word-break:break-word}th{background:#eaf2ff;text-align:left}th:nth-child(2),td:nth-child(2){width:24%}th:last-child,td:last-child{width:19%}a{color:#2563eb;text-decoration:none}.footer{margin-top:12px;color:#667085;text-align:right}@media print{button{display:none}}
+  </style></head><body><span class="conclusion">${reportHtmlEscape(report.conclusion)}</span><h1>${reportHtmlEscape(report.title)}</h1>
+  <div class="meta">報告期間：${reportHtmlEscape(report.period)}｜產生時間：${reportHtmlEscape(report.generatedAt)}<br>資料範圍：${reportHtmlEscape(report.filterLabel)}</div>
+  <div class="metrics">${metricCards}</div><section class="section"><h2>環境與進度分布</h2><div class="chips">${distributions}</div></section>
+  <section class="section"><h2>風險與阻塞</h2><p class="note">${reportHtmlEscape(report.risk || "無")}</p></section>
+  <section class="section"><h2>備註</h2><p class="note">${reportHtmlEscape(report.notes || "無")}</p></section>
+  <section class="section"><h2>測試明細（${report.items.length} 筆）</h2><table><thead><tr><th>需求單</th><th>標題</th><th>狀態</th><th>分類</th><th>QA</th><th>環境</th><th>提測日</th><th>關聯 BUG</th><th>備註</th></tr></thead><tbody>${rows}</tbody></table></section>
+  <p class="footer">由 AI 工具 Cloud 進度追蹤產生</p><script>window.addEventListener("load",()=>setTimeout(()=>window.print(),250));<\/script></body></html>`;
+}
+
+function printProgressReportPdf() {
+  if (!progressReport) {
+    showToast("請先產生測試報告預覽");
+    return;
+  }
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    showToast("瀏覽器封鎖了報告視窗，請允許彈出式視窗後重試");
+    return;
+  }
+  printWindow.opener = null;
+  printWindow.document.open();
+  printWindow.document.write(progressReportPrintHtml(progressReport));
+  printWindow.document.close();
+}
+
+function generateProgressReport() {
+  try {
+    progressReport = buildProgressReport();
+    renderProgressReport(progressReport);
+    byId("progressReportExcel").disabled = false;
+    byId("progressReportPdf").disabled = false;
+    byId("progressReportStatus").textContent = `已整理 ${progressReport.items.length} 筆；可下載 Excel 或列印並儲存為 PDF。`;
+    showToast("測試報告預覽已更新");
+  } catch (error) {
+    progressReport = null;
+    byId("progressReportExcel").disabled = true;
+    byId("progressReportPdf").disabled = true;
+    byId("progressReportPreview").classList.add("hidden");
+    byId("progressReportStatus").textContent = error instanceof Error ? error.message : "測試報告產生失敗";
+  }
+}
+
+function invalidateProgressReport() {
+  if (!progressReport) return;
+  progressReport = null;
+  byId("progressReportExcel").disabled = true;
+  byId("progressReportPdf").disabled = true;
+  byId("progressReportStatus").textContent = "進度資料或篩選條件已變更，請重新更新預覽。";
+}
+
+function toggleProgressReportBuilder() {
+  const builder = byId("progressReportBuilder");
+  const opening = builder.classList.contains("hidden");
+  builder.classList.toggle("hidden", !opening);
+  byId("progressReportToggle").textContent = opening ? "收合測試報告" : "產生測試報告";
+  if (opening) builder.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function initializeProgressReport() {
+  const dates = getWeekDates(dateKey(new Date()));
+  byId("progressReportStart").value = dateKey(dates[0]);
+  byId("progressReportEnd").value = dateKey(dates[4]);
+}
+
 function renderProgressBugs(row, item) {
   const cell = document.createElement("td");
   cell.className = "progress-bugs";
@@ -1707,6 +1987,7 @@ function progressCell(row, value, className = "") {
 }
 
 function renderProgressTable() {
+  invalidateProgressReport();
   updateProgressStatusFilter();
   updateProgressQaTesterFilter();
   const body = byId("progressTableBody");
@@ -2100,6 +2381,12 @@ byId("progressSearch").addEventListener("input", renderProgressTable);
 byId("progressEnvironmentFilter").addEventListener("change", renderProgressTable);
 byId("progressStatusFilter").addEventListener("change", renderProgressTable);
 byId("progressQaTesterFilter").addEventListener("change", renderProgressTable);
+byId("progressReportToggle").addEventListener("click", toggleProgressReportBuilder);
+byId("progressReportGenerate").addEventListener("click", generateProgressReport);
+byId("progressReportExcel").addEventListener("click", downloadProgressReportExcel);
+byId("progressReportPdf").addEventListener("click", printProgressReportPdf);
+["progressReportTitle", "progressReportStart", "progressReportEnd", "progressReportConclusion", "progressReportRisk", "progressReportNotes"]
+  .forEach((id) => byId(id).addEventListener("input", invalidateProgressReport));
 byId("settingsForm").addEventListener("submit", saveSettings);
 byId("healthCheck").addEventListener("click", checkHealth);
 
@@ -2114,4 +2401,5 @@ refreshBugUrls("https://agent-gsi2.gsiwl.com");
 fillSelect(byId("weeklyManualGroup"), WEEKLY_GROUPS, "其他／待處理");
 byId("weeklyDate").value = dateKey(new Date());
 loadWeekly();
+initializeProgressReport();
 checkJiraConnection();
