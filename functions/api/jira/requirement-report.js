@@ -17,6 +17,7 @@ const TELEGRAM_MENTIONS = [
   [/^Sim Yeh(?:\s|$)/i, "@shibayeh868"],
   [/^Edward(?:\s|$)/i, "@edward61211"],
   [/^Simon Wu(?:\s|$)/i, "@shinjuwu"],
+  [/^Jason hu(?:\s|$)/i, "@Hu_Jing_Jun"],
   [/^Corey(?:\s|$)/i, "@corey810125"],
   [/^JOSEPH(?:\s|$)/i, "@theodennnnn"],
   [/^Ken(?:\s|$)/i, "@kenyu123"],

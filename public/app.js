@@ -11,7 +11,8 @@ const ASSIGNEE_TELEGRAM = {
   Ken: "@kenyu123",
   KevinKao: "@shengxiang",
   "Will Zhang": "@WillZhang0121",
-  "Simon Wu": "@shinjuwu"
+  "Simon Wu": "@shinjuwu",
+  "Jason hu": "@Hu_Jing_Jun"
 };
 const MAX_BUG_ATTACHMENTS_PER_SECTION = 5;
 const MAX_BUG_ATTACHMENT_BYTES = 5 * 1024 * 1024;
